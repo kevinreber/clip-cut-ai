@@ -7,7 +7,8 @@
     "dev": "concurrently \"convex dev\" \"vite dev\"",
     "build": "vite build",
     "start": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "vercel-build": "bash scripts/vercel-build.sh"
   },
   "dependencies": {
     "@ffmpeg/ffmpeg": "^0.12.10",

@@ -4,4 +4,12 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [tanstackStart({ srcDirectory: "./app" }), tailwindcss()],
+  environments: {
+    ssr: {
+      resolve: {
+        // Bundle all dependencies for serverless deployment
+        noExternal: true,
+      },
+    },
+  },
 });
