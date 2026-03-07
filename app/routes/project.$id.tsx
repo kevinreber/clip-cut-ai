@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -124,7 +125,11 @@ function ProjectEditor() {
     try {
       await analyzeVideo({ projectId: id as Id<"projects"> });
     } catch (err: any) {
-      setAnalyzeError(err.message || "Analysis failed. Please try again.");
+      const message =
+        err instanceof ConvexError
+          ? (err.data as string)
+          : err.message || "Analysis failed. Please try again.";
+      setAnalyzeError(message);
     } finally {
       setAnalyzing(false);
     }

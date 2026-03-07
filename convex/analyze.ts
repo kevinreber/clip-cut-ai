@@ -1,6 +1,6 @@
 "use node";
 
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { action, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 
@@ -99,7 +99,7 @@ export const analyzeVideo = action({
   handler: async (ctx, args) => {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      throw new Error(
+      throw new ConvexError(
         "OPENAI_API_KEY environment variable is not set. " +
           "Add it in your Convex dashboard under Settings > Environment Variables."
       );
@@ -117,13 +117,13 @@ export const analyzeVideo = action({
         id: args.projectId,
       });
       if (!project || !project.videoFileId) {
-        throw new Error("Project not found or has no video file.");
+        throw new ConvexError("Project not found or has no video file.");
       }
 
       // Get the video blob from storage
       const videoBlob = await ctx.storage.get(project.videoFileId);
       if (!videoBlob) {
-        throw new Error("Video file not found in storage.");
+        throw new ConvexError("Video file not found in storage.");
       }
 
       // Read video as ArrayBuffer
@@ -152,7 +152,7 @@ export const analyzeVideo = action({
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(
+        throw new ConvexError(
           `Whisper API error (${response.status}): ${errorText}`
         );
       }
@@ -204,7 +204,12 @@ export const analyzeVideo = action({
         projectId: args.projectId,
         status: "ready",
       });
-      throw error;
+      if (error instanceof ConvexError) {
+        throw error;
+      }
+      throw new ConvexError(
+        error instanceof Error ? error.message : "Analysis failed unexpectedly."
+      );
     }
   },
 });
