@@ -1,8 +1,13 @@
 #!/bin/bash
 set -e
 
-# Run the normal Vite build
-npx vite build
+# Deploy Convex functions and run Vite build
+# On production: deploy functions + build. On preview: just build (uses prod Convex).
+if [ "$VERCEL_ENV" = "production" ]; then
+  npx convex deploy --cmd 'npx vite build'
+else
+  npx vite build
+fi
 
 # Create Vercel Build Output API structure
 rm -rf .vercel/output
