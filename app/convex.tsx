@@ -1,4 +1,5 @@
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexAuthProvider } from "@convex-dev/auth/react";
+import { ConvexReactClient } from "convex/react";
 import type { ReactNode } from "react";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL ?? "https://placeholder.convex.cloud";
@@ -6,5 +7,5 @@ const convexUrl = import.meta.env.VITE_CONVEX_URL ?? "https://placeholder.convex
 const convex = new ConvexReactClient(convexUrl);
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
-  return <ConvexProvider client={convex}>{children}</ConvexProvider>;
+  return <ConvexAuthProvider client={convex}>{children}</ConvexAuthProvider>;
 }

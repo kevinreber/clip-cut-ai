@@ -1,14 +1,34 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useRef, useState } from "react";
 import "../styles.css";
+import { AuthForm } from "../components/AuthForm";
+import { UserMenu } from "../components/UserMenu";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
 function HomePage() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <p className="text-text-muted">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <AuthForm />;
+  }
+
+  return <AuthenticatedHome />;
+}
+
+function AuthenticatedHome() {
   const projects = useQuery(api.projects.list);
   const createProject = useMutation(api.projects.create);
   const generateUploadUrl = useMutation(api.projects.generateUploadUrl);
@@ -78,6 +98,7 @@ function HomePage() {
           <h1 className="text-2xl font-bold text-white">
             ClipCut <span className="text-primary">AI</span>
           </h1>
+          <UserMenu />
         </div>
       </header>
 
