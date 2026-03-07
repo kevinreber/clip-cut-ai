@@ -16,12 +16,46 @@ cp -r dist/client/* .vercel/output/static/
 cat > .vercel/output/functions/index.func/index.mjs << 'ENTRYEOF'
 import server from "./server.js";
 
-export default async function handler(req) {
-  // Vercel passes a Request with a relative URL path (e.g. "/").
-  // TanStack Start's server.fetch needs an absolute URL.
-  const url = new URL(req.url, `https://${req.headers.get("host") || "localhost"}`);
-  const absoluteReq = new Request(url.toString(), req);
-  return await server.fetch(absoluteReq);
+export default async function handler(req, res) {
+  // Vercel's Nodejs launcher passes Node.js IncomingMessage/ServerResponse.
+  // TanStack Start expects a Web Request with an absolute URL.
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
+  const url = new URL(req.url, `${proto}://${host}`);
+
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
+  }
+
+  const hasBody = req.method !== "GET" && req.method !== "HEAD";
+  const webReq = new Request(url.toString(), {
+    method: req.method,
+    headers,
+    body: hasBody ? req : undefined,
+    duplex: hasBody ? "half" : undefined,
+  });
+
+  const webRes = await server.fetch(webReq);
+
+  res.statusCode = webRes.status;
+  for (const [key, value] of webRes.headers) {
+    res.setHeader(key, value);
+  }
+
+  if (webRes.body) {
+    const reader = webRes.body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+  res.end();
 }
 ENTRYEOF
 
