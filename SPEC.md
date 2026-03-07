@@ -70,5 +70,19 @@ projects: {
 - [x] Implement multi-device project syncing via **Convex Auth**.
 - [x] Finalize "One-Click Clean" feature to auto-delete all flagged fillers.
 
+### Phase 5: Advanced Features & UX
+- [x] **Toast notifications** - Replace browser alerts with elegant toast system.
+- [x] **Drag-and-drop upload** - Drop video files directly into the upload area.
+- [x] **Playback controls** - Volume slider, mute toggle, and playback speed (0.5x-4x).
+- [x] **Keyboard shortcut help panel** - Press `?` to view all shortcuts.
+- [x] **Export quality settings** - Choose between Fast, Balanced, and High Quality presets.
+- [x] **Batch operations** - Quick actions to remove all fillers, silences, or repetitions at once.
+- [x] **Waveform visualization** - Word-density waveform on the timeline for visual reference.
+- [x] **Undo history cap** - Limit to 100 states to prevent memory issues.
+- [x] **Unsaved changes warning** - Browser prompt before navigating away with edits.
+- [x] **Project pagination** - Paginated project grid with 12 per page.
+- [x] **Dark/Light theme toggle** - Persistent theme preference with smooth transitions.
+- [x] **Inline delete confirmation** - Replace browser confirm dialogs with inline UI.
+
 ---
 *Project: ClipCut AI | 2026*

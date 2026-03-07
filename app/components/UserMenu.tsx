@@ -1,6 +1,7 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { ThemeToggleButton } from "./ThemeToggle";
 
 export function UserMenu() {
   const { signOut } = useAuthActions();
@@ -10,6 +11,7 @@ export function UserMenu() {
 
   return (
     <div className="flex items-center gap-3">
+      <ThemeToggleButton />
       <span className="text-sm text-text-muted">{user.email}</span>
       <button
         onClick={() => signOut()}

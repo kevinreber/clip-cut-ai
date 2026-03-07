@@ -13,6 +13,7 @@ import { useVideoPlayer } from "../lib/use-video-player";
 import { useVideoCache } from "../lib/use-video-cache";
 import { AuthForm } from "../components/AuthForm";
 import { UserMenu } from "../components/UserMenu";
+import { useToast } from "../components/Toast";
 
 export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
@@ -66,6 +67,10 @@ function ProjectEditorContent() {
     seekTo: seekToTime,
     togglePlayPause,
     seekRelative,
+    playbackRate,
+    setPlaybackRate,
+    volume,
+    setVolume,
   } = useVideoPlayer(effectiveVideoUrl);
 
   const {
@@ -84,7 +89,9 @@ function ProjectEditorContent() {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [selection, setSelection] = useState<Set<number>>(new Set());
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const lastClickedIndex = useRef<number | null>(null);
+  const { addToast } = useToast();
 
   // Initialize transcript from project data
   useEffect(() => {
@@ -172,6 +179,12 @@ function ProjectEditorContent() {
   const deleteAllFillers = useCallback(() => {
     setTranscript((prev) =>
       prev.map((w) => (w.isFiller ? { ...w, isDeleted: true } : w))
+    );
+  }, [setTranscript]);
+
+  const deleteAllSilences = useCallback(() => {
+    setTranscript((prev) =>
+      prev.map((w) => (w.word.startsWith("[silence") ? { ...w, isDeleted: true } : w))
     );
   }, [setTranscript]);
 
@@ -285,12 +298,37 @@ function ProjectEditorContent() {
         case "ArrowRight": // Seek forward 5s
           seekRelative(5);
           break;
+        case "?": // Show shortcuts help
+          setShowShortcuts((s) => !s);
+          break;
+        case "]": // Speed up
+          setPlaybackRate(Math.min(4, playbackRate + 0.25));
+          break;
+        case "[": // Slow down
+          setPlaybackRate(Math.max(0.25, playbackRate - 0.25));
+          break;
+        case "m": // Mute/unmute
+          if (!e.metaKey && !e.ctrlKey) {
+            setVolume(volume === 0 ? 1 : 0);
+          }
+          break;
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleUndo, handleRedo, togglePlayPause, seekRelative]);
+  }, [handleUndo, handleRedo, togglePlayPause, seekRelative, playbackRate, volume, setPlaybackRate, setVolume]);
+
+  // Unsaved changes warning
+  const hasUnsavedChanges = canUndo;
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedChanges]);
 
   if (!project) {
     return (
@@ -300,10 +338,13 @@ function ProjectEditorContent() {
     );
   }
 
-  const fillerCount = transcript.filter((w) => w.isFiller).length;
+  const fillerCount = transcript.filter((w) => w.isFiller && !w.word.startsWith("[silence")).length;
   const deletedCount = transcript.filter((w) => w.isDeleted).length;
   const silenceCount = transcript.filter(
     (w) => w.word.startsWith("[silence")
+  ).length;
+  const repetitionCount = transcript.filter(
+    (w) => w.isFiller && w.word.startsWith("[rep:")
   ).length;
   const isAnalyzing = analyzing || project.status === "analyzing";
   const hasTranscript = transcript.length > 0;
@@ -384,8 +425,64 @@ function ProjectEditorContent() {
               )}
             </div>
 
-            {/* Stats Bar */}
-            <div className="mt-3 flex flex-wrap gap-3 rounded-lg bg-surface-light p-3 sm:mt-4 sm:gap-4 sm:p-4">
+            {/* Playback Controls */}
+            {effectiveVideoUrl && (
+              <div className="mt-3 flex items-center gap-3 rounded-lg bg-surface-light p-2 sm:mt-4 sm:p-3">
+                <button
+                  onClick={togglePlayPause}
+                  className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
+                >
+                  {isPlaying ? "Pause" : "Play"}
+                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setVolume(volume === 0 ? 1 : 0)}
+                    className="text-sm text-text-muted hover:text-white"
+                    title="Mute/Unmute (M)"
+                  >
+                    {volume === 0 ? "&#128263;" : volume < 0.5 ? "&#128264;" : "&#128266;"}
+                  </button>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={volume}
+                    onChange={(e) => setVolume(parseFloat(e.target.value))}
+                    className="w-16 accent-primary"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 text-sm text-text-muted">
+                  <span>Speed:</span>
+                  {[0.5, 1, 1.5, 2].map((rate) => (
+                    <button
+                      key={rate}
+                      onClick={() => setPlaybackRate(rate)}
+                      className={`rounded px-1.5 py-0.5 text-xs transition-colors ${
+                        playbackRate === rate
+                          ? "bg-primary text-white"
+                          : "bg-surface-lighter text-text-muted hover:text-white"
+                      }`}
+                    >
+                      {rate}x
+                    </button>
+                  ))}
+                </div>
+                <span className="ml-auto text-xs text-text-muted tabular-nums">
+                  {formatTimestamp(currentTime)} / {formatTimestamp(duration)}
+                </span>
+                <button
+                  onClick={() => setShowShortcuts(true)}
+                  className="rounded-md bg-surface-lighter px-2 py-1 text-xs text-text-muted transition-colors hover:text-white"
+                  title="Keyboard shortcuts (?)"
+                >
+                  ?
+                </button>
+              </div>
+            )}
+
+            {/* Stats & Actions Bar */}
+            <div className="mt-2 flex flex-wrap gap-3 rounded-lg bg-surface-light p-3 sm:gap-4 sm:p-4">
               {hasTranscript ? (
                 <>
                   <div className="text-sm">
@@ -397,7 +494,7 @@ function ProjectEditorContent() {
                   <div className="text-sm">
                     <span className="text-text-muted">Fillers: </span>
                     <span className="font-medium text-filler">
-                      {fillerCount - silenceCount}
+                      {fillerCount}
                     </span>
                   </div>
                   <div className="text-sm">
@@ -436,19 +533,29 @@ function ProjectEditorContent() {
                           ? "bg-primary text-white"
                           : "bg-surface-lighter text-text-muted hover:text-white"
                       }`}
-                      title="Preview playback with deleted segments skipped"
+                      title="Preview playback with deleted segments skipped (P)"
                     >
                       {previewMode ? "Preview On" : "Preview"}
                     </button>
+                  </div>
+                  {/* Batch Operations */}
+                  <div className="flex w-full flex-wrap gap-2 border-t border-surface-lighter pt-2">
+                    <span className="text-xs text-text-muted self-center">Quick actions:</span>
                     <button
                       onClick={deleteAllFillers}
-                      className="rounded-md bg-warning/20 px-3 py-1 text-sm font-medium text-warning transition-colors hover:bg-warning/30"
+                      className="rounded-md bg-warning/20 px-3 py-1 text-xs font-medium text-warning transition-colors hover:bg-warning/30"
                     >
-                      Remove All Fillers
+                      Remove All Fillers ({fillerCount})
+                    </button>
+                    <button
+                      onClick={deleteAllSilences}
+                      className="rounded-md bg-warning/20 px-3 py-1 text-xs font-medium text-warning transition-colors hover:bg-warning/30"
+                    >
+                      Remove All Silences ({silenceCount})
                     </button>
                     <button
                       onClick={restoreAll}
-                      className="rounded-md bg-surface-lighter px-3 py-1 text-sm font-medium text-text-muted transition-colors hover:text-white"
+                      className="rounded-md bg-surface-lighter px-3 py-1 text-xs font-medium text-text-muted transition-colors hover:text-white"
                     >
                       Restore All
                     </button>
@@ -621,12 +728,62 @@ function ProjectEditorContent() {
                 </div>
               </div>
               <div className="mt-2 hidden text-xs text-text-muted/60 sm:block">
-                Space: play/pause &middot; P: toggle preview &middot; &larr;/&rarr;: seek 5s &middot; Ctrl+Z: undo &middot; Ctrl+Shift+Z: redo
+                Press <kbd className="rounded bg-surface-lighter px-1 py-0.5">?</kbd> for all keyboard shortcuts
               </div>
             </div>
           </div>
         </div>
       </main>
+
+      {/* Keyboard Shortcuts Modal */}
+      {showShortcuts && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-fade-in"
+          onClick={() => setShowShortcuts(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-xl bg-surface-light border border-surface-lighter p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Keyboard Shortcuts</h3>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                className="text-text-muted hover:text-white text-xl"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="space-y-2 text-sm">
+              {[
+                ["Space", "Play / Pause"],
+                ["P", "Toggle preview mode"],
+                ["\u2190 / \u2192", "Seek back / forward 5s"],
+                ["[ / ]", "Slow down / Speed up playback"],
+                ["M", "Mute / Unmute"],
+                ["Ctrl+Z", "Undo"],
+                ["Ctrl+Shift+Z", "Redo"],
+                ["Shift+Click", "Select word range"],
+                ["Double-click", "Delete / Restore word"],
+                ["?", "Toggle this help"],
+              ].map(([key, desc]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <kbd className="rounded bg-surface px-2 py-1 text-xs font-mono text-white border border-surface-lighter">
+                    {key}
+                  </kbd>
+                  <span className="text-text-muted">{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function formatTimestamp(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
