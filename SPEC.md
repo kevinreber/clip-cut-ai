@@ -51,9 +51,9 @@ projects: {
 ## 🚀 Execution Roadmap
 
 ### Phase 1: The Reactive Foundation
-- [ ] Initialize **TanStack Start** + **Convex** project.
-- [ ] Implement Video Upload to Convex File Storage.
-- [ ] Create basic video player synced to a "dummy" transcript for UI testing.
+- [x] Initialize **TanStack Start** + **Convex** project.
+- [x] Implement Video Upload to Convex File Storage.
+- [x] Create basic video player synced to a "dummy" transcript for UI testing.
 
 ### Phase 2: AI Orchestration
 - [ ] Create a **Convex Action** to extract audio (using FFmpeg) and send to Whisper.
@@ -61,14 +61,14 @@ projects: {
 - [ ] Update the UI to highlight these segments automatically for user review.
 
 ### Phase 3: The Editing Engine
-- [ ] Implement "Delete word" functionality (updates `isDeleted` in Convex).
+- [x] Implement "Delete word" functionality (updates `isDeleted` in Convex).
 - [ ] Build the timeline "Cut" logic using the transcript timestamps.
 - [ ] Integrate `ffmpeg.wasm` to stitch segments together based on the `isDeleted` flags in the browser.
 
 ### Phase 4: Optimization & Polish
 - [ ] Add **Local-First caching** for video files to reduce repeated downloads.
 - [ ] Implement multi-device project syncing via **Clerk** or **Convex Auth**.
-- [ ] Finalize "One-Click Clean" feature to auto-delete all flagged fillers.
+- [x] Finalize "One-Click Clean" feature to auto-delete all flagged fillers.
 
 ---
 *Project: ClipCut AI | 2026*
