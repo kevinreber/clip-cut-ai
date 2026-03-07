@@ -7,8 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "../styles.css";
 import { Timeline } from "../components/Timeline";
 import { ExportButton } from "../components/ExportButton";
-import { getCachedVideo, cacheVideo } from "../lib/video-cache";
 import { computeKeptSegments } from "../lib/video-export";
+import { useUndoRedo } from "../lib/use-undo-redo";
+import { useVideoPlayer } from "../lib/use-video-player";
+import { useVideoCache } from "../lib/use-video-cache";
 import { AuthForm } from "../components/AuthForm";
 import { UserMenu } from "../components/UserMenu";
 
@@ -55,24 +57,40 @@ function ProjectEditorContent() {
   const analyzeVideo = useAction(api.analyze.analyzeVideo);
   const renameProject = useMutation(api.projects.renameProject);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [transcript, setTranscript] = useState<TranscriptWord[]>([]);
+  const effectiveVideoUrl = useVideoCache(project?.videoFileId, videoUrl);
+  const {
+    videoRef,
+    currentTime,
+    duration,
+    isPlaying,
+    seekTo: seekToTime,
+    togglePlayPause,
+    seekRelative,
+  } = useVideoPlayer(effectiveVideoUrl);
+
+  const {
+    state: transcript,
+    set: setTranscript,
+    undo: undoTranscript,
+    redo: redoTranscript,
+    reset: resetTranscript,
+    canUndo,
+    canRedo,
+  } = useUndoRedo<TranscriptWord[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [cachedVideoUrl, setCachedVideoUrl] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [selection, setSelection] = useState<Set<number>>(new Set());
+  const lastClickedIndex = useRef<number | null>(null);
 
   // Initialize transcript from project data
   useEffect(() => {
     if (initialized) return;
     if (project) {
-      setTranscript(
+      resetTranscript(
         project.transcript && project.transcript.length > 0
           ? project.transcript
           : []
@@ -84,65 +102,9 @@ function ProjectEditorContent() {
   // Update local transcript when project transcript changes (e.g. after analysis)
   useEffect(() => {
     if (project?.transcript && project.transcript.length > 0) {
-      setTranscript(project.transcript);
+      resetTranscript(project.transcript);
     }
   }, [project?.transcript]);
-
-  // Local-first video caching
-  useEffect(() => {
-    if (!project?.videoFileId || !videoUrl) return;
-    const storageId = project.videoFileId;
-    let revoked = false;
-
-    (async () => {
-      const cached = await getCachedVideo(storageId);
-      if (cached) {
-        const url = URL.createObjectURL(cached);
-        setCachedVideoUrl(url);
-        return;
-      }
-      // Fetch and cache for next time
-      try {
-        const resp = await fetch(videoUrl);
-        const blob = await resp.blob();
-        await cacheVideo(storageId, blob);
-        if (!revoked) {
-          const url = URL.createObjectURL(blob);
-          setCachedVideoUrl(url);
-        }
-      } catch {
-        // Fall back to remote URL
-      }
-    })();
-
-    return () => {
-      revoked = true;
-      if (cachedVideoUrl) URL.revokeObjectURL(cachedVideoUrl);
-    };
-  }, [project?.videoFileId, videoUrl]);
-
-  const effectiveVideoUrl = cachedVideoUrl || videoUrl;
-
-  // Sync video time with transcript highlight
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const onTimeUpdate = () => setCurrentTime(video.currentTime);
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
-    const onLoadedMetadata = () => setDuration(video.duration);
-    video.addEventListener("timeupdate", onTimeUpdate);
-    video.addEventListener("play", onPlay);
-    video.addEventListener("pause", onPause);
-    video.addEventListener("loadedmetadata", onLoadedMetadata);
-    if (video.duration) setDuration(video.duration);
-    return () => {
-      video.removeEventListener("timeupdate", onTimeUpdate);
-      video.removeEventListener("play", onPlay);
-      video.removeEventListener("pause", onPause);
-      video.removeEventListener("loadedmetadata", onLoadedMetadata);
-    };
-  }, [effectiveVideoUrl]);
 
   // Compute kept segments for preview mode
   const keptSegments = useMemo(
@@ -193,57 +155,97 @@ function ProjectEditorContent() {
 
   const toggleWordDeleted = useCallback(
     (index: number) => {
-      setTranscript((prev) => {
-        const next = prev.map((w, i) =>
+      setTranscript((prev) =>
+        prev.map((w, i) =>
           i === index ? { ...w, isDeleted: !w.isDeleted } : w
-        );
-        updateTranscript({
-          projectId: id as Id<"projects">,
-          transcript: next,
-        });
-        return next;
-      });
+        )
+      );
+    },
+    [setTranscript]
+  );
+
+  const seekToWord = useCallback(
+    (word: TranscriptWord) => seekToTime(word.start),
+    [seekToTime]
+  );
+
+  const deleteAllFillers = useCallback(() => {
+    setTranscript((prev) =>
+      prev.map((w) => (w.isFiller ? { ...w, isDeleted: true } : w))
+    );
+  }, [setTranscript]);
+
+  const restoreAll = useCallback(() => {
+    setTranscript((prev) => prev.map((w) => ({ ...w, isDeleted: false })));
+  }, [setTranscript]);
+
+  const handleWordClick = useCallback(
+    (index: number, e: React.MouseEvent) => {
+      if (e.shiftKey && lastClickedIndex.current !== null) {
+        // Range select
+        const start = Math.min(lastClickedIndex.current, index);
+        const end = Math.max(lastClickedIndex.current, index);
+        const newSelection = new Set<number>();
+        for (let i = start; i <= end; i++) {
+          newSelection.add(i);
+        }
+        setSelection(newSelection);
+        return;
+      }
+
+      // Normal click
+      lastClickedIndex.current = index;
+      setSelection(new Set());
+      const word = transcript[index];
+      if (word.isDeleted) {
+        toggleWordDeleted(index);
+      } else {
+        seekToWord(word);
+      }
+    },
+    [transcript, toggleWordDeleted, seekToWord]
+  );
+
+  const deleteSelection = useCallback(() => {
+    if (selection.size === 0) return;
+    setTranscript((prev) =>
+      prev.map((w, i) => (selection.has(i) ? { ...w, isDeleted: true } : w))
+    );
+    setSelection(new Set());
+  }, [selection, setTranscript]);
+
+  const restoreSelection = useCallback(() => {
+    if (selection.size === 0) return;
+    setTranscript((prev) =>
+      prev.map((w, i) => (selection.has(i) ? { ...w, isDeleted: false } : w))
+    );
+    setSelection(new Set());
+  }, [selection, setTranscript]);
+
+  // Sync undo/redo changes back to Convex
+  const syncTranscript = useCallback(
+    (t: TranscriptWord[]) => {
+      updateTranscript({ projectId: id as Id<"projects">, transcript: t });
     },
     [id, updateTranscript]
   );
 
-  const seekToWord = useCallback((word: TranscriptWord) => {
-    const video = videoRef.current;
-    if (video) {
-      video.currentTime = word.start;
+  const handleUndo = useCallback(() => {
+    undoTranscript();
+  }, [undoTranscript]);
+
+  const handleRedo = useCallback(() => {
+    redoTranscript();
+  }, [redoTranscript]);
+
+  // Persist after undo/redo (using a ref to track previous transcript)
+  const prevTranscriptRef = useRef(transcript);
+  useEffect(() => {
+    if (prevTranscriptRef.current !== transcript && initialized && transcript.length > 0) {
+      syncTranscript(transcript);
     }
-  }, []);
-
-  const seekToTime = useCallback((time: number) => {
-    const video = videoRef.current;
-    if (video) {
-      video.currentTime = time;
-    }
-  }, []);
-
-  const deleteAllFillers = useCallback(() => {
-    setTranscript((prev) => {
-      const next = prev.map((w) =>
-        w.isFiller ? { ...w, isDeleted: true } : w
-      );
-      updateTranscript({
-        projectId: id as Id<"projects">,
-        transcript: next,
-      });
-      return next;
-    });
-  }, [id, updateTranscript]);
-
-  const restoreAll = useCallback(() => {
-    setTranscript((prev) => {
-      const next = prev.map((w) => ({ ...w, isDeleted: false }));
-      updateTranscript({
-        projectId: id as Id<"projects">,
-        transcript: next,
-      });
-      return next;
-    });
-  }, [id, updateTranscript]);
+    prevTranscriptRef.current = transcript;
+  }, [transcript, initialized, syncTranscript]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -251,14 +253,26 @@ function ProjectEditorContent() {
       // Ignore when typing in an input
       if ((e.target as HTMLElement).tagName === "INPUT") return;
 
-      const video = videoRef.current;
+      // Undo: Ctrl+Z / Cmd+Z
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+      // Redo: Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y
+      if (
+        ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) ||
+        ((e.ctrlKey || e.metaKey) && e.key === "y")
+      ) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
 
       switch (e.key) {
         case " ": // Space to play/pause
           e.preventDefault();
-          if (video) {
-            video.paused ? video.play() : video.pause();
-          }
+          togglePlayPause();
           break;
         case "p": // Toggle preview mode
           if (!e.metaKey && !e.ctrlKey) {
@@ -266,21 +280,17 @@ function ProjectEditorContent() {
           }
           break;
         case "ArrowLeft": // Seek back 5s
-          if (video) {
-            video.currentTime = Math.max(0, video.currentTime - 5);
-          }
+          seekRelative(-5);
           break;
         case "ArrowRight": // Seek forward 5s
-          if (video) {
-            video.currentTime = Math.min(video.duration, video.currentTime + 5);
-          }
+          seekRelative(5);
           break;
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [handleUndo, handleRedo, togglePlayPause, seekRelative]);
 
   if (!project) {
     return (
@@ -404,6 +414,22 @@ function ProjectEditorContent() {
                   </div>
                   <div className="ml-auto flex flex-wrap gap-2">
                     <button
+                      onClick={handleUndo}
+                      disabled={!canUndo}
+                      className="rounded-md bg-surface-lighter px-2.5 py-1 text-sm font-medium text-text-muted transition-colors hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Undo (Ctrl+Z)"
+                    >
+                      &#8630;
+                    </button>
+                    <button
+                      onClick={handleRedo}
+                      disabled={!canRedo}
+                      className="rounded-md bg-surface-lighter px-2.5 py-1 text-sm font-medium text-text-muted transition-colors hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Redo (Ctrl+Shift+Z)"
+                    >
+                      &#8631;
+                    </button>
+                    <button
                       onClick={() => setPreviewMode((p) => !p)}
                       className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
                         previewMode
@@ -480,7 +506,7 @@ function ProjectEditorContent() {
               <h2 className="font-semibold text-white">Transcript</h2>
               <p className="mt-1 text-xs text-text-muted">
                 {hasTranscript
-                  ? "Click a word to seek. Double-click to delete/restore. Fillers & silences are highlighted."
+                  ? "Click to seek. Double-click to delete/restore. Shift+click to select a range."
                   : "Analyze your video to generate a transcript."}
               </p>
             </div>
@@ -498,38 +524,64 @@ function ProjectEditorContent() {
                   </p>
                 </div>
               ) : hasTranscript ? (
-                <div className="flex flex-wrap gap-1">
-                  {transcript.map((word, index) => {
-                    const isActive =
-                      currentTime >= word.start && currentTime < word.end;
-                    const isSilence = word.word.startsWith("[silence");
-                    return (
+                <>
+                  <div className="flex flex-wrap gap-1">
+                    {transcript.map((word, index) => {
+                      const isActive =
+                        currentTime >= word.start && currentTime < word.end;
+                      const isSilence = word.word.startsWith("[silence");
+                      const isSelected = selection.has(index);
+                      return (
+                        <button
+                          key={index}
+                          onClick={(e) => handleWordClick(index, e)}
+                          onDoubleClick={() => toggleWordDeleted(index)}
+                          title={`${word.start.toFixed(1)}s - ${word.end.toFixed(1)}s${word.isFiller ? (isSilence ? " (silence)" : " (filler)") : ""}. Double-click to ${word.isDeleted ? "restore" : "delete"}. Shift+click to select range.`}
+                          className={`inline-block rounded px-1.5 py-0.5 text-sm transition-all ${
+                            isSelected
+                              ? "bg-primary/30 text-white ring-1 ring-primary"
+                              : word.isDeleted
+                                ? "bg-deleted/10 text-deleted line-through opacity-50"
+                                : isSilence
+                                  ? "bg-warning/10 text-warning/70 italic text-xs"
+                                  : word.isFiller
+                                    ? "bg-filler/20 text-filler hover:bg-filler/30"
+                                    : "text-text hover:bg-surface-lighter"
+                          } ${isActive && !isSelected ? "ring-2 ring-primary" : ""}`}
+                        >
+                          {word.word}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Selection action bar */}
+                  {selection.size > 0 && (
+                    <div className="sticky bottom-0 mt-2 flex items-center gap-2 rounded-lg bg-surface border border-surface-lighter p-2">
+                      <span className="text-xs text-text-muted">
+                        {selection.size} word{selection.size > 1 ? "s" : ""} selected
+                      </span>
                       <button
-                        key={index}
-                        onClick={() => {
-                          if (word.isDeleted) {
-                            toggleWordDeleted(index);
-                          } else {
-                            seekToWord(word);
-                          }
-                        }}
-                        onDoubleClick={() => toggleWordDeleted(index)}
-                        title={`${word.start.toFixed(1)}s - ${word.end.toFixed(1)}s${word.isFiller ? (isSilence ? " (silence)" : " (filler)") : ""}. Double-click to ${word.isDeleted ? "restore" : "delete"}.`}
-                        className={`inline-block rounded px-1.5 py-0.5 text-sm transition-all ${
-                          word.isDeleted
-                            ? "bg-deleted/10 text-deleted line-through opacity-50"
-                            : isSilence
-                              ? "bg-warning/10 text-warning/70 italic text-xs"
-                              : word.isFiller
-                                ? "bg-filler/20 text-filler hover:bg-filler/30"
-                                : "text-text hover:bg-surface-lighter"
-                        } ${isActive ? "ring-2 ring-primary" : ""}`}
+                        onClick={deleteSelection}
+                        className="ml-auto rounded-md bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
                       >
-                        {word.word}
+                        Delete Selected
                       </button>
-                    );
-                  })}
-                </div>
+                      <button
+                        onClick={restoreSelection}
+                        className="rounded-md bg-success/20 px-3 py-1 text-xs font-medium text-success transition-colors hover:bg-success/30"
+                      >
+                        Restore Selected
+                      </button>
+                      <button
+                        onClick={() => setSelection(new Set())}
+                        className="rounded-md bg-surface-lighter px-2 py-1 text-xs text-text-muted transition-colors hover:text-white"
+                      >
+                        &#10005;
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div className="mb-4 text-4xl">&#127908;</div>
@@ -569,7 +621,7 @@ function ProjectEditorContent() {
                 </div>
               </div>
               <div className="mt-2 hidden text-xs text-text-muted/60 sm:block">
-                Space: play/pause &middot; P: toggle preview &middot; &larr;/&rarr;: seek 5s
+                Space: play/pause &middot; P: toggle preview &middot; &larr;/&rarr;: seek 5s &middot; Ctrl+Z: undo &middot; Ctrl+Shift+Z: redo
               </div>
             </div>
           </div>
