@@ -17,7 +17,11 @@ cat > .vercel/output/functions/index.func/index.mjs << 'ENTRYEOF'
 import server from "./server.js";
 
 export default async function handler(req) {
-  return await server.fetch(req);
+  // Vercel passes a Request with a relative URL path (e.g. "/").
+  // TanStack Start's server.fetch needs an absolute URL.
+  const url = new URL(req.url, `https://${req.headers.get("host") || "localhost"}`);
+  const absoluteReq = new Request(url.toString(), req);
+  return await server.fetch(absoluteReq);
 }
 ENTRYEOF
 
