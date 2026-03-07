@@ -27,6 +27,11 @@ if [ -d "dist/server/assets" ]; then
   cp -r dist/server/assets .vercel/output/functions/index.func/assets
 fi
 
+# Enable ESM for the function directory
+cat > .vercel/output/functions/index.func/package.json << 'PKGEOF'
+{ "type": "module" }
+PKGEOF
+
 # Node.js serverless function config
 cat > .vercel/output/functions/index.func/.vc-config.json << 'FUNCEOF'
 {
