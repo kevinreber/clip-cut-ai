@@ -11,6 +11,8 @@
     "vercel-build": "bash scripts/vercel-build.sh"
   },
   "dependencies": {
+    "@auth/core": "^0.37.4",
+    "@convex-dev/auth": "^0.0.91",
     "@ffmpeg/ffmpeg": "^0.12.10",
     "@ffmpeg/util": "^0.12.1",
     "@tanstack/react-router": "^1.166.2",

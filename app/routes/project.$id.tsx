@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -8,6 +8,8 @@ import "../styles.css";
 import { Timeline } from "../components/Timeline";
 import { ExportButton } from "../components/ExportButton";
 import { getCachedVideo, cacheVideo } from "../lib/video-cache";
+import { AuthForm } from "../components/AuthForm";
+import { UserMenu } from "../components/UserMenu";
 
 export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
@@ -22,6 +24,24 @@ type TranscriptWord = {
 };
 
 function ProjectEditor() {
+  const { isAuthenticated, isLoading } = useConvexAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <p className="text-text-muted">Loading...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <AuthForm />;
+  }
+
+  return <ProjectEditorContent />;
+}
+
+function ProjectEditorContent() {
   const { id } = Route.useParams();
   const project = useQuery(api.projects.get, {
     id: id as Id<"projects">,
@@ -229,6 +249,9 @@ function ProjectEditor() {
           >
             {project.status}
           </span>
+          <div className="ml-auto">
+            <UserMenu />
+          </div>
         </div>
       </header>
 

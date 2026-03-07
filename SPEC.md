@@ -67,7 +67,7 @@ projects: {
 
 ### Phase 4: Optimization & Polish
 - [x] Add **Local-First caching** for video files to reduce repeated downloads.
-- [ ] Implement multi-device project syncing via **Clerk** or **Convex Auth**.
+- [x] Implement multi-device project syncing via **Convex Auth**.
 - [x] Finalize "One-Click Clean" feature to auto-delete all flagged fillers.
 
 ---
