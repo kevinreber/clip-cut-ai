@@ -4,6 +4,9 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "../styles.css";
+import { Timeline } from "../components/Timeline";
+import { ExportButton } from "../components/ExportButton";
+import { getCachedVideo, cacheVideo } from "../lib/video-cache";
 
 export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
@@ -31,11 +34,13 @@ function ProjectEditor() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptWord[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [cachedVideoUrl, setCachedVideoUrl] = useState<string | null>(null);
 
   // Initialize transcript from project data
   useEffect(() => {
@@ -57,6 +62,41 @@ function ProjectEditor() {
     }
   }, [project?.transcript]);
 
+  // Local-first video caching
+  useEffect(() => {
+    if (!project?.videoFileId || !videoUrl) return;
+    const storageId = project.videoFileId;
+    let revoked = false;
+
+    (async () => {
+      const cached = await getCachedVideo(storageId);
+      if (cached) {
+        const url = URL.createObjectURL(cached);
+        setCachedVideoUrl(url);
+        return;
+      }
+      // Fetch and cache for next time
+      try {
+        const resp = await fetch(videoUrl);
+        const blob = await resp.blob();
+        await cacheVideo(storageId, blob);
+        if (!revoked) {
+          const url = URL.createObjectURL(blob);
+          setCachedVideoUrl(url);
+        }
+      } catch {
+        // Fall back to remote URL
+      }
+    })();
+
+    return () => {
+      revoked = true;
+      if (cachedVideoUrl) URL.revokeObjectURL(cachedVideoUrl);
+    };
+  }, [project?.videoFileId, videoUrl]);
+
+  const effectiveVideoUrl = cachedVideoUrl || videoUrl;
+
   // Sync video time with transcript highlight
   useEffect(() => {
     const video = videoRef.current;
@@ -64,15 +104,19 @@ function ProjectEditor() {
     const onTimeUpdate = () => setCurrentTime(video.currentTime);
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
+    const onLoadedMetadata = () => setDuration(video.duration);
     video.addEventListener("timeupdate", onTimeUpdate);
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
+    video.addEventListener("loadedmetadata", onLoadedMetadata);
+    if (video.duration) setDuration(video.duration);
     return () => {
       video.removeEventListener("timeupdate", onTimeUpdate);
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
+      video.removeEventListener("loadedmetadata", onLoadedMetadata);
     };
-  }, [videoUrl]);
+  }, [effectiveVideoUrl]);
 
   const handleAnalyze = useCallback(async () => {
     setAnalyzing(true);
@@ -106,6 +150,13 @@ function ProjectEditor() {
     const video = videoRef.current;
     if (video) {
       video.currentTime = word.start;
+    }
+  }, []);
+
+  const seekToTime = useCallback((time: number) => {
+    const video = videoRef.current;
+    if (video) {
+      video.currentTime = time;
     }
   }, []);
 
@@ -181,10 +232,10 @@ function ProjectEditor() {
           {/* Video Player */}
           <div>
             <div className="overflow-hidden rounded-lg bg-black">
-              {videoUrl ? (
+              {effectiveVideoUrl ? (
                 <video
                   ref={videoRef}
-                  src={videoUrl}
+                  src={effectiveVideoUrl}
                   controls
                   className="aspect-video w-full"
                 />
@@ -245,7 +296,7 @@ function ProjectEditor() {
                       ? "AI is analyzing your video..."
                       : "No transcript yet. Analyze your video to get started."}
                   </span>
-                  {!isAnalyzing && videoUrl && (
+                  {!isAnalyzing && effectiveVideoUrl && (
                     <button
                       onClick={handleAnalyze}
                       className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/80"
@@ -261,6 +312,26 @@ function ProjectEditor() {
               <div className="mt-3 rounded-lg bg-danger/10 border border-danger/20 p-3 text-sm text-danger">
                 {analyzeError}
               </div>
+            )}
+
+            {/* Timeline */}
+            {hasTranscript && duration > 0 && (
+              <Timeline
+                transcript={transcript}
+                duration={duration}
+                currentTime={currentTime}
+                onSeek={seekToTime}
+              />
+            )}
+
+            {/* Export */}
+            {hasTranscript && effectiveVideoUrl && duration > 0 && (
+              <ExportButton
+                videoUrl={effectiveVideoUrl}
+                transcript={transcript}
+                videoDuration={duration}
+                projectName={project.name}
+              />
             )}
           </div>
 
@@ -326,7 +397,7 @@ function ProjectEditor() {
                   <p className="text-sm text-text-muted">
                     No transcript yet.
                   </p>
-                  {videoUrl && (
+                  {effectiveVideoUrl && (
                     <button
                       onClick={handleAnalyze}
                       className="mt-4 rounded-md bg-primary px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/80"

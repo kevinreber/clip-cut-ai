@@ -62,11 +62,11 @@ projects: {
 
 ### Phase 3: The Editing Engine
 - [x] Implement "Delete word" functionality (updates `isDeleted` in Convex).
-- [ ] Build the timeline "Cut" logic using the transcript timestamps.
-- [ ] Integrate `ffmpeg.wasm` to stitch segments together based on the `isDeleted` flags in the browser.
+- [x] Build the timeline "Cut" logic using the transcript timestamps.
+- [x] Integrate `ffmpeg.wasm` to stitch segments together based on the `isDeleted` flags in the browser.
 
 ### Phase 4: Optimization & Polish
-- [ ] Add **Local-First caching** for video files to reduce repeated downloads.
+- [x] Add **Local-First caching** for video files to reduce repeated downloads.
 - [ ] Implement multi-device project syncing via **Clerk** or **Convex Auth**.
 - [x] Finalize "One-Click Clean" feature to auto-delete all flagged fillers.
 
