@@ -4,4 +4,3 @@ dist/
 .vinxi/
 .env
 .env.local
-convex/_generated/
