@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -9,35 +9,13 @@ export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
 });
 
-// Dummy transcript for UI testing (Phase 1)
-const DUMMY_TRANSCRIPT = [
-  { word: "So", start: 0.0, end: 0.3, isFiller: false, isDeleted: false },
-  { word: "um", start: 0.3, end: 0.6, isFiller: true, isDeleted: false },
-  { word: "today", start: 0.7, end: 1.1, isFiller: false, isDeleted: false },
-  { word: "we're", start: 1.1, end: 1.3, isFiller: false, isDeleted: false },
-  { word: "going", start: 1.3, end: 1.6, isFiller: false, isDeleted: false },
-  { word: "to", start: 1.6, end: 1.7, isFiller: false, isDeleted: false },
-  { word: "talk", start: 1.7, end: 2.0, isFiller: false, isDeleted: false },
-  { word: "about", start: 2.0, end: 2.3, isFiller: false, isDeleted: false },
-  { word: "uh", start: 2.4, end: 2.7, isFiller: true, isDeleted: false },
-  { word: "video", start: 2.8, end: 3.2, isFiller: false, isDeleted: false },
-  { word: "editing", start: 3.2, end: 3.7, isFiller: false, isDeleted: false },
-  { word: "with", start: 3.8, end: 4.0, isFiller: false, isDeleted: false },
-  { word: "AI", start: 4.0, end: 4.4, isFiller: false, isDeleted: false },
-  { word: "um", start: 4.5, end: 4.8, isFiller: true, isDeleted: false },
-  { word: "and", start: 4.9, end: 5.1, isFiller: false, isDeleted: false },
-  { word: "how", start: 5.1, end: 5.3, isFiller: false, isDeleted: false },
-  { word: "it", start: 5.3, end: 5.4, isFiller: false, isDeleted: false },
-  { word: "can", start: 5.4, end: 5.6, isFiller: false, isDeleted: false },
-  { word: "help", start: 5.6, end: 5.9, isFiller: false, isDeleted: false },
-  { word: "you", start: 5.9, end: 6.1, isFiller: false, isDeleted: false },
-  { word: "uh", start: 6.2, end: 6.5, isFiller: true, isDeleted: false },
-  { word: "create", start: 6.6, end: 7.0, isFiller: false, isDeleted: false },
-  { word: "better", start: 7.0, end: 7.3, isFiller: false, isDeleted: false },
-  { word: "content", start: 7.3, end: 7.8, isFiller: false, isDeleted: false },
-];
-
-type TranscriptWord = (typeof DUMMY_TRANSCRIPT)[number];
+type TranscriptWord = {
+  word: string;
+  start: number;
+  end: number;
+  isFiller: boolean;
+  isDeleted: boolean;
+};
 
 function ProjectEditor() {
   const { id } = Route.useParams();
@@ -49,25 +27,35 @@ function ProjectEditor() {
     project?.videoFileId ? { storageId: project.videoFileId } : "skip"
   );
   const updateTranscript = useMutation(api.projects.updateTranscript);
+  const analyzeVideo = useAction(api.analyze.analyzeVideo);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptWord[]>([]);
   const [initialized, setInitialized] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
-  // Initialize transcript from project or use dummy
+  // Initialize transcript from project data
   useEffect(() => {
     if (initialized) return;
     if (project) {
       setTranscript(
         project.transcript && project.transcript.length > 0
           ? project.transcript
-          : DUMMY_TRANSCRIPT
+          : []
       );
       setInitialized(true);
     }
   }, [project, initialized]);
+
+  // Update local transcript when project transcript changes (e.g. after analysis)
+  useEffect(() => {
+    if (project?.transcript && project.transcript.length > 0) {
+      setTranscript(project.transcript);
+    }
+  }, [project?.transcript]);
 
   // Sync video time with transcript highlight
   useEffect(() => {
@@ -86,13 +74,24 @@ function ProjectEditor() {
     };
   }, [videoUrl]);
 
+  const handleAnalyze = useCallback(async () => {
+    setAnalyzing(true);
+    setAnalyzeError(null);
+    try {
+      await analyzeVideo({ projectId: id as Id<"projects"> });
+    } catch (err: any) {
+      setAnalyzeError(err.message || "Analysis failed. Please try again.");
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [id, analyzeVideo]);
+
   const toggleWordDeleted = useCallback(
     (index: number) => {
       setTranscript((prev) => {
         const next = prev.map((w, i) =>
           i === index ? { ...w, isDeleted: !w.isDeleted } : w
         );
-        // Persist to Convex
         updateTranscript({
           projectId: id as Id<"projects">,
           transcript: next,
@@ -144,6 +143,11 @@ function ProjectEditor() {
 
   const fillerCount = transcript.filter((w) => w.isFiller).length;
   const deletedCount = transcript.filter((w) => w.isDeleted).length;
+  const silenceCount = transcript.filter(
+    (w) => w.word.startsWith("[silence")
+  ).length;
+  const isAnalyzing = analyzing || project.status === "analyzing";
+  const hasTranscript = transcript.length > 0;
 
   return (
     <div className="min-h-screen bg-surface">
@@ -193,35 +197,71 @@ function ProjectEditor() {
 
             {/* Stats Bar */}
             <div className="mt-4 flex flex-wrap gap-4 rounded-lg bg-surface-light p-4">
-              <div className="text-sm">
-                <span className="text-text-muted">Words: </span>
-                <span className="font-medium text-white">
-                  {transcript.length}
-                </span>
-              </div>
-              <div className="text-sm">
-                <span className="text-text-muted">Fillers: </span>
-                <span className="font-medium text-filler">{fillerCount}</span>
-              </div>
-              <div className="text-sm">
-                <span className="text-text-muted">Deleted: </span>
-                <span className="font-medium text-deleted">{deletedCount}</span>
-              </div>
-              <div className="ml-auto flex gap-2">
-                <button
-                  onClick={deleteAllFillers}
-                  className="rounded-md bg-warning/20 px-3 py-1 text-sm font-medium text-warning transition-colors hover:bg-warning/30"
-                >
-                  Remove All Fillers
-                </button>
-                <button
-                  onClick={restoreAll}
-                  className="rounded-md bg-surface-lighter px-3 py-1 text-sm font-medium text-text-muted transition-colors hover:text-white"
-                >
-                  Restore All
-                </button>
-              </div>
+              {hasTranscript ? (
+                <>
+                  <div className="text-sm">
+                    <span className="text-text-muted">Words: </span>
+                    <span className="font-medium text-white">
+                      {transcript.length - silenceCount}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-text-muted">Fillers: </span>
+                    <span className="font-medium text-filler">
+                      {fillerCount - silenceCount}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-text-muted">Silences: </span>
+                    <span className="font-medium text-filler">
+                      {silenceCount}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    <span className="text-text-muted">Deleted: </span>
+                    <span className="font-medium text-deleted">
+                      {deletedCount}
+                    </span>
+                  </div>
+                  <div className="ml-auto flex gap-2">
+                    <button
+                      onClick={deleteAllFillers}
+                      className="rounded-md bg-warning/20 px-3 py-1 text-sm font-medium text-warning transition-colors hover:bg-warning/30"
+                    >
+                      Remove All Fillers
+                    </button>
+                    <button
+                      onClick={restoreAll}
+                      className="rounded-md bg-surface-lighter px-3 py-1 text-sm font-medium text-text-muted transition-colors hover:text-white"
+                    >
+                      Restore All
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex w-full items-center justify-between">
+                  <span className="text-sm text-text-muted">
+                    {isAnalyzing
+                      ? "AI is analyzing your video..."
+                      : "No transcript yet. Analyze your video to get started."}
+                  </span>
+                  {!isAnalyzing && videoUrl && (
+                    <button
+                      onClick={handleAnalyze}
+                      className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/80"
+                    >
+                      Analyze Video
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
+
+            {analyzeError && (
+              <div className="mt-3 rounded-lg bg-danger/10 border border-danger/20 p-3 text-sm text-danger">
+                {analyzeError}
+              </div>
+            )}
           </div>
 
           {/* Transcript Panel */}
@@ -229,39 +269,73 @@ function ProjectEditor() {
             <div className="border-b border-surface-lighter px-4 py-3">
               <h2 className="font-semibold text-white">Transcript</h2>
               <p className="mt-1 text-xs text-text-muted">
-                Click a word to delete/restore it. Filler words are highlighted.
+                {hasTranscript
+                  ? "Click a word to seek. Double-click to delete/restore. Fillers & silences are highlighted."
+                  : "Analyze your video to generate a transcript."}
               </p>
             </div>
             <div className="max-h-[60vh] overflow-y-auto p-4">
-              <div className="flex flex-wrap gap-1">
-                {transcript.map((word, index) => {
-                  const isActive =
-                    currentTime >= word.start && currentTime < word.end;
-                  return (
+              {isAnalyzing ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="mb-4 text-4xl animate-spin">&#9881;</div>
+                  <p className="text-sm font-medium text-white">
+                    Analyzing video with AI...
+                  </p>
+                  <p className="mt-2 text-xs text-text-muted">
+                    Extracting audio and generating word-level timestamps.
+                    <br />
+                    This may take a minute depending on video length.
+                  </p>
+                </div>
+              ) : hasTranscript ? (
+                <div className="flex flex-wrap gap-1">
+                  {transcript.map((word, index) => {
+                    const isActive =
+                      currentTime >= word.start && currentTime < word.end;
+                    const isSilence = word.word.startsWith("[silence");
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          if (word.isDeleted) {
+                            toggleWordDeleted(index);
+                          } else {
+                            seekToWord(word);
+                          }
+                        }}
+                        onDoubleClick={() => toggleWordDeleted(index)}
+                        title={`${word.start.toFixed(1)}s - ${word.end.toFixed(1)}s${word.isFiller ? (isSilence ? " (silence)" : " (filler)") : ""}. Double-click to ${word.isDeleted ? "restore" : "delete"}.`}
+                        className={`inline-block rounded px-1.5 py-0.5 text-sm transition-all ${
+                          word.isDeleted
+                            ? "bg-deleted/10 text-deleted line-through opacity-50"
+                            : isSilence
+                              ? "bg-warning/10 text-warning/70 italic text-xs"
+                              : word.isFiller
+                                ? "bg-filler/20 text-filler hover:bg-filler/30"
+                                : "text-text hover:bg-surface-lighter"
+                        } ${isActive ? "ring-2 ring-primary" : ""}`}
+                      >
+                        {word.word}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="mb-4 text-4xl">&#127908;</div>
+                  <p className="text-sm text-text-muted">
+                    No transcript yet.
+                  </p>
+                  {videoUrl && (
                     <button
-                      key={index}
-                      onClick={() => {
-                        if (word.isDeleted) {
-                          toggleWordDeleted(index);
-                        } else {
-                          seekToWord(word);
-                        }
-                      }}
-                      onDoubleClick={() => toggleWordDeleted(index)}
-                      title={`${word.start.toFixed(1)}s - ${word.end.toFixed(1)}s${word.isFiller ? " (filler)" : ""}. Double-click to ${word.isDeleted ? "restore" : "delete"}.`}
-                      className={`inline-block rounded px-1.5 py-0.5 text-sm transition-all ${
-                        word.isDeleted
-                          ? "bg-deleted/10 text-deleted line-through opacity-50"
-                          : word.isFiller
-                            ? "bg-filler/20 text-filler hover:bg-filler/30"
-                            : "text-text hover:bg-surface-lighter"
-                      } ${isActive ? "ring-2 ring-primary" : ""}`}
+                      onClick={handleAnalyze}
+                      className="mt-4 rounded-md bg-primary px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-primary/80"
                     >
-                      {word.word}
+                      Analyze Video with AI
                     </button>
-                  );
-                })}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Legend */}
@@ -270,6 +344,10 @@ function ProjectEditor() {
                 <div className="flex items-center gap-1.5">
                   <span className="inline-block h-3 w-3 rounded bg-filler/30" />
                   Filler word
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-block h-3 w-3 rounded bg-warning/20" />
+                  Silence
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="inline-block h-3 w-3 rounded bg-deleted/30" />

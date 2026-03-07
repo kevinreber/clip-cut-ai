@@ -56,9 +56,9 @@ projects: {
 - [x] Create basic video player synced to a "dummy" transcript for UI testing.
 
 ### Phase 2: AI Orchestration
-- [ ] Create a **Convex Action** to extract audio (using FFmpeg) and send to Whisper.
-- [ ] Develop logic to flag "ums/uhs" and silences in the returned JSON timestamps.
-- [ ] Update the UI to highlight these segments automatically for user review.
+- [x] Create a **Convex Action** to extract audio (using FFmpeg) and send to Whisper.
+- [x] Develop logic to flag "ums/uhs" and silences in the returned JSON timestamps.
+- [x] Update the UI to highlight these segments automatically for user review.
 
 ### Phase 3: The Editing Engine
 - [x] Implement "Delete word" functionality (updates `isDeleted` in Convex).
