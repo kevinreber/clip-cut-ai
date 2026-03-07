@@ -3,7 +3,7 @@ import {
   ScrollRestoration,
   createRootRoute,
 } from "@tanstack/react-router";
-import { Meta, Scripts } from "@tanstack/start";
+import { HeadContent, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { ConvexClientProvider } from "../convex";
 
@@ -35,7 +35,7 @@ function RootDocument({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
-        <Meta />
+        <HeadContent />
       </head>
       <body>
         {children}
