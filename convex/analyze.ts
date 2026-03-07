@@ -47,6 +47,37 @@ function isFillerWord(word: string): boolean {
   return FILLER_WORDS.has(normalized);
 }
 
+function normalizeWord(word: string): string {
+  return word.toLowerCase().replace(/[^a-z']/g, "").trim();
+}
+
+function detectRepetitions(words: WhisperWord[]): Set<number> {
+  const repeated = new Set<number>();
+  // Detect consecutive identical words (e.g. "I I", "the the the")
+  for (let i = 1; i < words.length; i++) {
+    const prev = normalizeWord(words[i - 1].word);
+    const curr = normalizeWord(words[i].word);
+    if (prev.length >= 1 && prev === curr) {
+      // Mark the duplicate (keep the last occurrence, flag earlier ones)
+      repeated.add(i - 1);
+      // If there's a chain (a a a), keep flagging
+      if (i >= 2 && normalizeWord(words[i - 2].word) === curr) {
+        repeated.add(i - 1);
+      }
+    }
+  }
+  // Also detect 2-word phrase repetitions (e.g. "I think I think")
+  for (let i = 2; i < words.length - 1; i++) {
+    const phrase1 = normalizeWord(words[i - 2].word) + " " + normalizeWord(words[i - 1].word);
+    const phrase2 = normalizeWord(words[i].word) + " " + normalizeWord(words[i + 1].word);
+    if (phrase1.length >= 3 && phrase1 === phrase2) {
+      repeated.add(i - 2);
+      repeated.add(i - 1);
+    }
+  }
+  return repeated;
+}
+
 function processTranscript(
   words: WhisperWord[]
 ): Array<{
@@ -64,9 +95,11 @@ function processTranscript(
     isDeleted: boolean;
   }> = [];
 
+  const repetitions = detectRepetitions(words);
+
   for (let i = 0; i < words.length; i++) {
     const w = words[i];
-    const isFiller = isFillerWord(w.word);
+    const isFiller = isFillerWord(w.word) || repetitions.has(i);
 
     transcript.push({
       word: w.word.trim(),

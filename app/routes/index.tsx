@@ -93,29 +93,29 @@ function AuthenticatedHome() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <header className="border-b border-surface-lighter px-6 py-4">
+      <header className="border-b border-surface-lighter px-4 py-4 sm:px-6">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-xl font-bold text-white sm:text-2xl">
             ClipCut <span className="text-primary">AI</span>
           </h1>
           <UserMenu />
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 py-12">
-        <div className="mb-12 text-center">
-          <h2 className="mb-3 text-4xl font-bold text-white">
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+        <div className="mb-8 text-center sm:mb-12">
+          <h2 className="mb-3 text-2xl font-bold text-white sm:text-4xl">
             Remove filler words instantly
           </h2>
-          <p className="text-lg text-text-muted">
+          <p className="text-base text-text-muted sm:text-lg">
             Upload a video and let AI detect ums, uhs, silences, and
             repetitions. Edit your transcript to cut your video.
           </p>
         </div>
 
-        <div className="mb-12 flex justify-center">
+        <div className="mb-8 flex justify-center sm:mb-12">
           <label
-            className={`flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-16 py-12 transition-colors ${
+            className={`flex w-full max-w-md cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-8 py-10 transition-colors sm:px-16 sm:py-12 ${
               uploading
                 ? "border-primary bg-primary/10"
                 : "border-surface-lighter hover:border-primary hover:bg-surface-light"

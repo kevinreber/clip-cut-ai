@@ -101,6 +101,22 @@ export const updateTranscript = mutation({
   },
 });
 
+export const renameProject = mutation({
+  args: {
+    id: v.id("projects"),
+    name: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const project = await ctx.db.get(args.id);
+    if (!project || project.userId !== userId) {
+      throw new Error("Project not found");
+    }
+    await ctx.db.patch(args.id, { name: args.name });
+  },
+});
+
 export const deleteProject = mutation({
   args: { id: v.id("projects") },
   handler: async (ctx, args) => {
