@@ -3,11 +3,12 @@ import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { ConvexError } from "convex/values";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "../styles.css";
 import { Timeline } from "../components/Timeline";
 import { ExportButton } from "../components/ExportButton";
 import { getCachedVideo, cacheVideo } from "../lib/video-cache";
+import { computeKeptSegments } from "../lib/video-export";
 import { AuthForm } from "../components/AuthForm";
 import { UserMenu } from "../components/UserMenu";
 
@@ -52,6 +53,7 @@ function ProjectEditorContent() {
   );
   const updateTranscript = useMutation(api.projects.updateTranscript);
   const analyzeVideo = useAction(api.analyze.analyzeVideo);
+  const renameProject = useMutation(api.projects.renameProject);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -62,6 +64,9 @@ function ProjectEditorContent() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [cachedVideoUrl, setCachedVideoUrl] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
 
   // Initialize transcript from project data
   useEffect(() => {
@@ -139,6 +144,37 @@ function ProjectEditorContent() {
     };
   }, [effectiveVideoUrl]);
 
+  // Compute kept segments for preview mode
+  const keptSegments = useMemo(
+    () => (transcript.length > 0 && duration > 0 ? computeKeptSegments(transcript, duration) : []),
+    [transcript, duration]
+  );
+
+  // Preview mode: skip deleted segments during playback
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !previewMode || keptSegments.length === 0) return;
+
+    const onTimeUpdate = () => {
+      const t = video.currentTime;
+      // Check if current time is inside a deleted region
+      const currentSeg = keptSegments.find((s) => t >= s.start - 0.05 && t < s.end);
+      if (!currentSeg) {
+        // Find the next kept segment
+        const nextSeg = keptSegments.find((s) => s.start > t);
+        if (nextSeg) {
+          video.currentTime = nextSeg.start;
+        } else {
+          // Past all segments, pause
+          video.pause();
+        }
+      }
+    };
+
+    video.addEventListener("timeupdate", onTimeUpdate);
+    return () => video.removeEventListener("timeupdate", onTimeUpdate);
+  }, [previewMode, keptSegments]);
+
   const handleAnalyze = useCallback(async () => {
     setAnalyzing(true);
     setAnalyzeError(null);
@@ -209,6 +245,43 @@ function ProjectEditorContent() {
     });
   }, [id, updateTranscript]);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      // Ignore when typing in an input
+      if ((e.target as HTMLElement).tagName === "INPUT") return;
+
+      const video = videoRef.current;
+
+      switch (e.key) {
+        case " ": // Space to play/pause
+          e.preventDefault();
+          if (video) {
+            video.paused ? video.play() : video.pause();
+          }
+          break;
+        case "p": // Toggle preview mode
+          if (!e.metaKey && !e.ctrlKey) {
+            setPreviewMode((p) => !p);
+          }
+          break;
+        case "ArrowLeft": // Seek back 5s
+          if (video) {
+            video.currentTime = Math.max(0, video.currentTime - 5);
+          }
+          break;
+        case "ArrowRight": // Seek forward 5s
+          if (video) {
+            video.currentTime = Math.min(video.duration, video.currentTime + 5);
+          }
+          break;
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   if (!project) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
@@ -227,19 +300,46 @@ function ProjectEditorContent() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <header className="border-b border-surface-lighter px-6 py-3">
-        <div className="mx-auto flex max-w-7xl items-center gap-4">
+      <header className="border-b border-surface-lighter px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 sm:gap-4">
           <Link
             to="/"
-            className="text-text-muted transition-colors hover:text-white"
+            className="shrink-0 text-text-muted transition-colors hover:text-white"
           >
-            &larr; Back
+            &larr; <span className="hidden sm:inline">Back</span>
           </Link>
-          <h1 className="truncate text-lg font-semibold text-white">
-            {project.name}
-          </h1>
+          {isRenaming ? (
+            <input
+              autoFocus
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={() => {
+                const trimmed = renameValue.trim();
+                if (trimmed && trimmed !== project.name) {
+                  renameProject({ id: project._id, name: trimmed });
+                }
+                setIsRenaming(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                if (e.key === "Escape") setIsRenaming(false);
+              }}
+              className="min-w-0 rounded border border-primary bg-surface px-2 py-0.5 text-base font-semibold text-white outline-none sm:text-lg"
+            />
+          ) : (
+            <h1
+              className="min-w-0 cursor-pointer truncate text-base font-semibold text-white sm:text-lg"
+              onDoubleClick={() => {
+                setRenameValue(project.name);
+                setIsRenaming(true);
+              }}
+              title="Double-click to rename"
+            >
+              {project.name}
+            </h1>
+          )}
           <span
-            className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${
+            className={`ml-1 shrink-0 rounded-full px-2 py-0.5 text-xs font-medium sm:ml-2 ${
               project.status === "ready"
                 ? "bg-success/20 text-success"
                 : project.status === "analyzing"
@@ -249,14 +349,14 @@ function ProjectEditorContent() {
           >
             {project.status}
           </span>
-          <div className="ml-auto">
+          <div className="ml-auto hidden sm:block">
             <UserMenu />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-6">
-        <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
+      <main className="mx-auto max-w-7xl px-4 py-4 sm:px-6 sm:py-6">
+        <div className="grid gap-4 sm:gap-6 lg:grid-cols-[1fr_400px]">
           {/* Video Player */}
           <div>
             <div className="overflow-hidden rounded-lg bg-black">
@@ -275,7 +375,7 @@ function ProjectEditorContent() {
             </div>
 
             {/* Stats Bar */}
-            <div className="mt-4 flex flex-wrap gap-4 rounded-lg bg-surface-light p-4">
+            <div className="mt-3 flex flex-wrap gap-3 rounded-lg bg-surface-light p-3 sm:mt-4 sm:gap-4 sm:p-4">
               {hasTranscript ? (
                 <>
                   <div className="text-sm">
@@ -302,7 +402,18 @@ function ProjectEditorContent() {
                       {deletedCount}
                     </span>
                   </div>
-                  <div className="ml-auto flex gap-2">
+                  <div className="ml-auto flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setPreviewMode((p) => !p)}
+                      className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                        previewMode
+                          ? "bg-primary text-white"
+                          : "bg-surface-lighter text-text-muted hover:text-white"
+                      }`}
+                      title="Preview playback with deleted segments skipped"
+                    >
+                      {previewMode ? "Preview On" : "Preview"}
+                    </button>
                     <button
                       onClick={deleteAllFillers}
                       className="rounded-md bg-warning/20 px-3 py-1 text-sm font-medium text-warning transition-colors hover:bg-warning/30"
@@ -373,7 +484,7 @@ function ProjectEditorContent() {
                   : "Analyze your video to generate a transcript."}
               </p>
             </div>
-            <div className="max-h-[60vh] overflow-y-auto p-4">
+            <div className="max-h-[40vh] overflow-y-auto p-4 lg:max-h-[60vh]">
               {isAnalyzing ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <div className="mb-4 text-4xl animate-spin">&#9881;</div>
@@ -442,7 +553,7 @@ function ProjectEditorContent() {
               <div className="flex flex-wrap gap-4 text-xs text-text-muted">
                 <div className="flex items-center gap-1.5">
                   <span className="inline-block h-3 w-3 rounded bg-filler/30" />
-                  Filler word
+                  Filler/Repetition
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="inline-block h-3 w-3 rounded bg-warning/20" />
@@ -456,6 +567,9 @@ function ProjectEditorContent() {
                   <span className="inline-block h-3 w-3 rounded ring-2 ring-primary" />
                   Current
                 </div>
+              </div>
+              <div className="mt-2 hidden text-xs text-text-muted/60 sm:block">
+                Space: play/pause &middot; P: toggle preview &middot; &larr;/&rarr;: seek 5s
               </div>
             </div>
           </div>
