@@ -1,5 +1,11 @@
 import { useState, useCallback } from "react";
 import { exportVideo, type ExportProgress } from "../lib/video-export";
+import {
+  generateSrt,
+  generateVtt,
+  generatePlainText,
+  downloadTextFile,
+} from "../lib/subtitle-export";
 
 type TranscriptWord = {
   word: string;
@@ -108,6 +114,41 @@ export function ExportButton({
             ? "Export Edited Video"
             : "Delete words to enable export"}
       </button>
+
+      {/* Subtitle / transcript export */}
+      <div className="mt-2 flex gap-2">
+        <button
+          onClick={() => {
+            const baseName = projectName.replace(/\.[^.]+$/, "");
+            downloadTextFile(generateSrt(transcript), `${baseName}.srt`, "text/srt");
+          }}
+          className="flex-1 rounded-lg border border-surface-lighter px-3 py-2 text-xs font-medium text-text-muted transition-colors hover:border-primary hover:text-white"
+        >
+          Export SRT
+        </button>
+        <button
+          onClick={() => {
+            const baseName = projectName.replace(/\.[^.]+$/, "");
+            downloadTextFile(generateVtt(transcript), `${baseName}.vtt`, "text/vtt");
+          }}
+          className="flex-1 rounded-lg border border-surface-lighter px-3 py-2 text-xs font-medium text-text-muted transition-colors hover:border-primary hover:text-white"
+        >
+          Export VTT
+        </button>
+        <button
+          onClick={() => {
+            const baseName = projectName.replace(/\.[^.]+$/, "");
+            downloadTextFile(
+              generatePlainText(transcript),
+              `${baseName}.txt`,
+              "text/plain"
+            );
+          }}
+          className="flex-1 rounded-lg border border-surface-lighter px-3 py-2 text-xs font-medium text-text-muted transition-colors hover:border-primary hover:text-white"
+        >
+          Export Text
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import "../styles.css";
 import { AuthForm } from "../components/AuthForm";
 import { UserMenu } from "../components/UserMenu";
@@ -28,6 +28,8 @@ function HomePage() {
   return <AuthenticatedHome />;
 }
 
+type SortOption = "newest" | "oldest" | "name";
+
 function AuthenticatedHome() {
   const projects = useQuery(api.projects.list);
   const createProject = useMutation(api.projects.create);
@@ -39,6 +41,31 @@ function AuthenticatedHome() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
+
+  const filteredProjects = useMemo(() => {
+    if (!projects) return [];
+    let result = projects;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter((p) => p.name.toLowerCase().includes(q));
+    }
+
+    return [...result].sort((a, b) => {
+      switch (sortBy) {
+        case "newest":
+          return b.createdAt - a.createdAt;
+        case "oldest":
+          return a.createdAt - b.createdAt;
+        case "name":
+          return a.name.localeCompare(b.name);
+        default:
+          return 0;
+      }
+    });
+  }, [projects, searchQuery, sortBy]);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -158,11 +185,35 @@ function AuthenticatedHome() {
 
         {projects && projects.length > 0 && (
           <div>
-            <h3 className="mb-4 text-xl font-semibold text-white">
-              Your Projects
-            </h3>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-xl font-semibold text-white">
+                Your Projects
+                <span className="ml-2 text-sm font-normal text-text-muted">
+                  ({filteredProjects.length}
+                  {searchQuery ? ` of ${projects.length}` : ""})
+                </span>
+              </h3>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Search projects..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="rounded-lg border border-surface-lighter bg-surface px-3 py-1.5 text-sm text-white placeholder-text-muted outline-none focus:border-primary"
+                />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="rounded-lg border border-surface-lighter bg-surface px-3 py-1.5 text-sm text-white outline-none focus:border-primary"
+                >
+                  <option value="newest">Newest</option>
+                  <option value="oldest">Oldest</option>
+                  <option value="name">Name</option>
+                </select>
+              </div>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {projects.map((project) => (
+              {filteredProjects.map((project) => (
                 <div
                   key={project._id}
                   className="group cursor-pointer rounded-lg border border-surface-lighter bg-surface-light p-4 transition-colors hover:border-primary"
