@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useConvexAuth, useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 import { useState } from "react";
 import { UserMenu } from "../components/UserMenu";
 import { useToast } from "../components/Toast";
 import { AuthForm } from "../components/AuthForm";
+import { WebhookSettings } from "../components/WebhookSettings";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -33,6 +35,13 @@ function SettingsContent() {
   const apiKeyInfo = useQuery(api.userApiKeysHelpers.hasApiKey);
   const deleteApiKey = useMutation(api.userApiKeysHelpers.deleteApiKey);
   const validateAndSave = useAction(api.userApiKeys.validateAndSaveOpenAIKey);
+
+  // Webhook queries/mutations
+  const webhooks = useQuery(api.webhooks.list);
+  const addWebhook = useMutation(api.webhooks.add);
+  const removeWebhook = useMutation(api.webhooks.remove);
+  const toggleWebhook = useMutation(api.webhooks.toggle);
+  const testWebhook = useMutation(api.webhooks.test);
 
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -68,6 +77,43 @@ function SettingsContent() {
     }
   }
 
+  async function handleAddWebhook(url: string, events: string[]) {
+    try {
+      await addWebhook({ url, events });
+      addToast("Webhook added!", "success");
+    } catch (err: any) {
+      addToast(err?.message ?? "Failed to add webhook.", "error");
+      throw err;
+    }
+  }
+
+  async function handleDeleteWebhook(id: Id<"webhooks">) {
+    try {
+      await removeWebhook({ id });
+      addToast("Webhook removed.", "info");
+    } catch {
+      addToast("Failed to remove webhook.", "error");
+    }
+  }
+
+  async function handleToggleWebhook(id: Id<"webhooks">, active: boolean) {
+    try {
+      await toggleWebhook({ id, active });
+      addToast(active ? "Webhook enabled." : "Webhook disabled.", "info");
+    } catch {
+      addToast("Failed to update webhook.", "error");
+    }
+  }
+
+  async function handleTestWebhook(id: Id<"webhooks">) {
+    try {
+      await testWebhook({ id });
+      addToast("Test webhook sent!", "success");
+    } catch {
+      addToast("Failed to send test webhook.", "error");
+    }
+  }
+
   const hasSavedKey =
     apiKeyInfo && typeof apiKeyInfo === "object" && apiKeyInfo.hasSavedKey;
   const maskedKey =
@@ -92,7 +138,7 @@ function SettingsContent() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+      <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 space-y-8">
         {/* API Key Section */}
         <section className="rounded-lg border border-surface-lighter bg-surface-light p-6">
           <h2 className="mb-1 text-lg font-semibold text-white">
@@ -309,6 +355,15 @@ function SettingsContent() {
             </div>
           </div>
         </section>
+
+        {/* Webhook Settings */}
+        <WebhookSettings
+          webhooks={webhooks}
+          onAdd={handleAddWebhook}
+          onDelete={handleDeleteWebhook}
+          onToggle={handleToggleWebhook}
+          onTest={handleTestWebhook}
+        />
       </main>
     </div>
   );

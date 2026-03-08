@@ -86,4 +86,31 @@ export default defineSchema({
     quality: v.string(),
     format: v.string(),
   }).index("by_userId", ["userId"]),
+  webhooks: defineTable({
+    userId: v.string(),
+    url: v.string(),
+    events: v.array(v.string()),
+    active: v.boolean(),
+    secret: v.string(),
+    lastTriggeredAt: v.optional(v.number()),
+    createdAt: v.number(),
+  }).index("by_userId", ["userId"]),
+  cleanupPresets: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    description: v.string(),
+    category: v.string(),
+    silenceThreshold: v.number(),
+    customFillerWords: v.array(v.string()),
+    confidenceThreshold: v.number(),
+    removeFillers: v.boolean(),
+    removeSilences: v.boolean(),
+    shortenSilences: v.boolean(),
+    shortenSilenceTarget: v.number(),
+    isPublic: v.boolean(),
+    usageCount: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_public", ["isPublic"]),
 });

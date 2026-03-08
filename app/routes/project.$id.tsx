@@ -26,6 +26,8 @@ import { ClipExtractor } from "../components/ClipExtractor";
 import { AnimatedCaptions } from "../components/AnimatedCaptions";
 import { AudioEnhancement } from "../components/AudioEnhancement";
 import { AIRewriteSuggestions } from "../components/AIRewriteSuggestions";
+import { IntroOutroTemplates } from "../components/IntroOutroTemplates";
+import { PresetsLibrary } from "../components/PresetsLibrary";
 
 export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
@@ -80,6 +82,11 @@ function ProjectEditorContent() {
   const extractClips = useAction(api.aiFeatures.extractClips);
   const generateRewriteSuggestions = useAction(api.aiFeatures.generateRewriteSuggestions);
   const updateProject = useMutation(api.projects.updateCaptionStyle);
+  const myPresets = useQuery(api.cleanupPresets.listMine);
+  const communityPresets = useQuery(api.cleanupPresets.listCommunity);
+  const savePreset = useMutation(api.cleanupPresets.save);
+  const deletePreset = useMutation(api.cleanupPresets.remove);
+  const incrementPresetUsage = useMutation(api.cleanupPresets.incrementUsage);
 
   const effectiveVideoUrl = useVideoCache(project?.videoFileId, videoUrl);
   const {
@@ -130,6 +137,8 @@ function ProjectEditorContent() {
   const [extractingClips, setExtractingClips] = useState(false);
   const [generatingRewrites, setGeneratingRewrites] = useState(false);
   const [editorMode, setEditorMode] = useState<"word" | "text">("word");
+  const [introTemplate, setIntroTemplate] = useState<any>(null);
+  const [outroTemplate, setOutroTemplate] = useState<any>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSavedTranscriptRef = useRef<string>("");
   const lastClickedIndex = useRef<number | null>(null);
@@ -726,6 +735,44 @@ function ProjectEditorContent() {
     [project, updateProject]
   );
 
+  const handleSavePreset = useCallback(async (preset: any) => {
+    await savePreset(preset);
+    addToast("Preset saved!", "success");
+  }, [savePreset, addToast]);
+
+  const handleDeletePreset = useCallback(async (id: any) => {
+    await deletePreset({ id });
+    addToast("Preset deleted.", "info");
+  }, [deletePreset, addToast]);
+
+  const handleApplyPreset = useCallback((preset: any) => {
+    if (preset.customFillerWords) {
+      setCustomFillerWords(preset.customFillerWords);
+      if (project) {
+        updateCustomFillerWords({
+          projectId: project._id,
+          customFillerWords: preset.customFillerWords,
+        });
+      }
+    }
+    if (typeof preset.silenceThreshold === "number") {
+      setSilenceThreshold(preset.silenceThreshold);
+      if (project) {
+        updateSilenceThreshold({
+          projectId: project._id,
+          silenceThreshold: preset.silenceThreshold,
+        });
+      }
+    }
+    if (typeof preset.confidenceThreshold === "number") {
+      setConfidenceThreshold(preset.confidenceThreshold);
+    }
+    if (preset._id) {
+      incrementPresetUsage({ id: preset._id });
+    }
+    addToast(`Preset "${preset.name}" applied!`, "success");
+  }, [project, updateCustomFillerWords, updateSilenceThreshold, incrementPresetUsage, addToast]);
+
   if (!project) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
@@ -1193,6 +1240,32 @@ function ProjectEditorContent() {
                 projectName={project.name}
                 currentCaptionStyle={project.captionStyle}
                 onStyleChange={handleCaptionStyleChange}
+              />
+            )}
+
+            {/* Intro/Outro Templates */}
+            {hasTranscript && (
+              <IntroOutroTemplates
+                introTemplate={introTemplate}
+                outroTemplate={outroTemplate}
+                onIntroChange={setIntroTemplate}
+                onOutroChange={setOutroTemplate}
+              />
+            )}
+
+            {/* Templates & Presets Library */}
+            {hasTranscript && (
+              <PresetsLibrary
+                presets={myPresets}
+                communityPresets={communityPresets}
+                onSave={handleSavePreset}
+                onDelete={handleDeletePreset}
+                onApply={handleApplyPreset}
+                currentSettings={{
+                  silenceThreshold,
+                  customFillerWords,
+                  confidenceThreshold,
+                }}
               />
             )}
 
