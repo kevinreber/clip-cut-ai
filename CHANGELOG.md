@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - AI Clip Extraction — automatically find the best 30-90 second clips from your video for TikTok, Reels, and Shorts, scored by viral potential with content tags
 - Animated Captions — choose from 4 caption styles (Classic, Bold Pop, Karaoke, Minimal) with live preview, and export word-level SRT or styled ASS subtitle files with animation effects
 - E2E test suite for speaker diarization, clip extraction, and animated captions features
+- Pre-push Claude hook that runs E2E tests automatically when code files change, blocking push on test failures
 - AI Summary & Show Notes — generate a concise summary, key topics, takeaways, and notable quotes from your transcript using GPT-4o-mini, with one-click copy for show notes
 - Auto-Generated Chapters — AI detects topic boundaries in your transcript and creates chapter markers with timestamps, exportable in YouTube chapter format
 - Text-Based Video Editing — switch between Word and Text editor modes; Text mode groups words into paragraphs that can be dragged to reorder, or deleted/restored as blocks
