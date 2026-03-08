@@ -152,11 +152,28 @@ export const analyzeVideo = action({
     customFillerWords: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
-    const apiKey = process.env.OPENAI_API_KEY;
+    // Check for user's own API key first, then fall back to platform key
+    let apiKey: string | null = null;
+
+    const identity = await ctx.auth.getUserIdentity();
+    if (identity) {
+      const userKey = await ctx.runQuery(
+        internal.userApiKeysHelpers.getApiKeyByUserId,
+        { userId: identity.subject }
+      );
+      if (userKey) {
+        apiKey = userKey;
+      }
+    }
+
+    if (!apiKey) {
+      apiKey = process.env.OPENAI_API_KEY ?? null;
+    }
+
     if (!apiKey) {
       throw new ConvexError(
-        "OPENAI_API_KEY environment variable is not set. " +
-          "Add it in your Convex dashboard under Settings > Environment Variables."
+        "No OpenAI API key available. Add your own key in Settings, " +
+          "or contact the site admin."
       );
     }
 

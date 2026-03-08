@@ -4,6 +4,12 @@ import { authTables } from "@convex-dev/auth/server";
 
 export default defineSchema({
   ...authTables,
+  userApiKeys: defineTable({
+    userId: v.string(),
+    openaiApiKey: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_userId", ["userId"]),
   projects: defineTable({
     name: v.string(),
     userId: v.string(),

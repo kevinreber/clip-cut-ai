@@ -92,4 +92,70 @@ projects: {
 - [x] **Theme & export tests** - Theme toggle persistence, export quality UI, subtitle export buttons.
 
 ---
+
+## 💡 Feature Brainstorm (Future Phases)
+
+A running list of potential new features, organized by category. Items are unchecked and unprioritized — this is a living brainstorm doc.
+
+### AI & Transcription Enhancements
+- [ ] **Multi-language transcription** — Whisper supports 90+ languages; let users select a language or auto-detect it before analysis.
+- [ ] **Speaker diarization** — Identify and label different speakers in the transcript (e.g., "Speaker A", "Speaker B") with per-speaker color coding.
+- [ ] **AI smart cuts** — Go beyond fillers: detect and flag mumbled/low-confidence segments, false starts, and off-topic tangents using an LLM pass over the transcript.
+- [ ] **AI video summary** — Generate a short text summary or bullet-point outline of the video's content using an LLM.
+- [ ] **Custom filler word dictionary** — Let users add their own filler words/phrases (e.g., "basically", "right", "sort of") to the detection list per project or globally.
+- [ ] **Adjustable silence threshold** — Let users configure the minimum silence duration (currently hardcoded at 2s) via a slider (0.5s–5s).
+- [ ] **Confidence scores** — Show Whisper's per-word confidence and let users filter/flag low-confidence words for review.
+- [ ] **AI-powered chapter markers** — Auto-detect topic changes and generate chapter markers with titles, useful for YouTube uploads.
+
+### Editing & Timeline
+- [ ] **Manual trim handles** — Drag-to-trim start/end points on individual segments in the timeline, beyond word-level granularity.
+- [ ] **Transcript search & replace** — Find specific words/phrases in the transcript and bulk-select or replace them.
+- [ ] **Split & merge segments** — Manually split a word segment or merge adjacent segments for fine-grained control.
+- [ ] **Clip extraction** — Select a range of the transcript and export just that portion as a standalone clip.
+- [ ] **Multi-track timeline** — Visual timeline with separate audio and video tracks for more advanced editing.
+- [ ] **Markers & annotations** — Let users drop custom markers on the timeline with notes (e.g., "re-record this section").
+- [ ] **Keyboard shortcuts expansion** — Add shortcuts for common actions: J/K/L for rewind/pause/forward, arrow keys for word-by-word navigation, number keys for playback speed.
+
+### Export & Output
+- [ ] **Audio-only export** — Export just the cleaned audio as MP3/WAV, perfect for podcast workflows.
+- [ ] **Burn-in subtitles** — Render captions directly onto the video with customizable font, size, position, and style.
+- [ ] **Custom resolution & format** — Let users choose output resolution (1080p, 720p, 480p) and container format (MP4, WebM).
+- [ ] **Direct social media upload** — One-click export to YouTube, TikTok, Instagram Reels, or Vimeo via their APIs.
+- [ ] **Animated captions export** — Generate trendy word-by-word animated captions (TikTok/Reels style) overlaid on the video.
+- [ ] **GIF/short clip export** — Export a selected segment as an animated GIF or short-form clip.
+- [ ] **Intro/outro templates** — Append a branded intro or outro card to the exported video.
+
+### Collaboration & Sharing
+- [ ] **Shared projects** — Invite collaborators by email to view or edit a project together.
+- [ ] **Commenting system** — Leave timestamped comments on the transcript for async review (e.g., "keep this part").
+- [ ] **Share preview link** — Generate a public or password-protected link to share the edited video preview (no download).
+- [ ] **Team workspaces** — Organization-level accounts with shared project libraries and member roles.
+
+### UX & Quality of Life
+- [ ] **Auto-save** — Add periodic background saves (every 30s) with a visual save indicator. *(Partial: transcript already syncs reactively on change, but lacks a timer-based safety net and save status UI.)*
+- [ ] **Version history** — Browse and restore previous edit states of a project, beyond the in-session undo/redo stack.
+- [ ] **Project folders/tags** — Organize projects into folders or apply tags for better library management.
+- [ ] **Batch processing** — Upload multiple videos and apply a "clean all fillers + silences" preset to all of them in one go.
+- [ ] **Video thumbnails** — Auto-generate thumbnail previews for each project on the dashboard (extract a frame at 25%).
+- [ ] **Drag-to-reorder segments** — Reorder kept segments in the timeline to rearrange the video's narrative flow.
+- [ ] **Side-by-side before/after** — Preview the original vs. edited video simultaneously for comparison.
+- [ ] **Analytics dashboard** — Show stats across all projects: total filler words removed, total time saved, most common fillers, etc.
+- [ ] **Onboarding tour** — First-time user walkthrough highlighting key features (transcript panel, timeline, export).
+
+### Audio & Video Processing
+- [ ] **Audio normalization** — Auto-level audio volume across the video to fix quiet/loud segments.
+- [ ] **Noise reduction** — AI-powered background noise removal (fan hum, keyboard clicks, echo).
+- [ ] **Audio ducking** — Automatically lower background music volume when speech is detected.
+- [ ] **Fade transitions** — Add configurable crossfade (audio) and fade-to-black (video) between cuts instead of hard jumps.
+- [ ] **Playback speed ramp** — Speed up silence/filler sections instead of cutting them entirely (e.g., 3x speed through pauses).
+
+### Integrations & Platform
+- [ ] **Zoom/Teams/Meet import** — Import cloud recordings directly from meeting platforms via OAuth.
+- [ ] **Google Drive / Dropbox import** — Pull videos from cloud storage without downloading locally first.
+- [ ] **PWA (Progressive Web App)** — Installable app experience with offline support for previously cached projects.
+- [ ] **Browser extension** — Clip and edit videos from the web (e.g., right-click a video → "Edit in ClipCut").
+- [ ] **REST API** — Public API for programmatic video analysis and export, enabling third-party integrations.
+- [ ] **Webhook notifications** — Notify external services (Slack, Discord, email) when a video analysis completes.
+
+---
 *Project: ClipCut AI | 2026*
