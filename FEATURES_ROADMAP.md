@@ -155,9 +155,9 @@ Features that move ClipCut toward a comprehensive AI-native video editor (Descri
 | 14 | ~~AI Summary & Show Notes~~ | Low-Med | High | P1 - DONE |
 | 1 | ~~Auto Chapters~~ | Medium | High | P1 - DONE |
 | 12 | ~~Text-Based Editing~~ | Medium | Very High | P1 - DONE |
-| 9 | Animated Captions | High | Very High | P1 |
-| 8 | AI Clip Extraction | High | Very High | P1 |
-| 3 | Speaker Diarization | Med-High | Very High | P1 |
+| 9 | ~~Animated Captions~~ | High | Very High | P1 - DONE |
+| 8 | ~~AI Clip Extraction~~ | High | Very High | P1 - DONE |
+| 3 | ~~Speaker Diarization~~ | Med-High | Very High | P1 - DONE |
 | 10 | Audio Enhancement | Medium | High | P2 |
 | 5 | AI Rewrite Suggestions | Medium | Medium | P2 |
 | 4 | Batch Processing | Medium | High | P2 |

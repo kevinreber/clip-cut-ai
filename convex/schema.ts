@@ -45,6 +45,28 @@ export default defineSchema({
         })
       )
     ),
+    speakers: v.optional(
+      v.array(
+        v.object({
+          name: v.string(),
+          color: v.string(),
+          wordIndices: v.array(v.number()),
+        })
+      )
+    ),
+    clips: v.optional(
+      v.array(
+        v.object({
+          title: v.string(),
+          description: v.string(),
+          start: v.number(),
+          end: v.number(),
+          score: v.number(),
+          tags: v.array(v.string()),
+        })
+      )
+    ),
+    captionStyle: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_userId", ["userId"]),
   exportPresets: defineTable({
