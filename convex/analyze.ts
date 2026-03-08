@@ -21,8 +21,8 @@ const FILLER_WORDS = new Set([
   "so", // flagged only when at start followed by pause
 ]);
 
-// Minimum gap between words (in seconds) to flag as a silence
-const SILENCE_THRESHOLD = 2.0;
+// Default minimum gap between words (in seconds) to flag as a silence
+const DEFAULT_SILENCE_THRESHOLD = 2.0;
 
 interface WhisperWord {
   word: string;
@@ -81,7 +81,8 @@ function detectRepetitions(words: WhisperWord[]): Set<number> {
 
 function processTranscript(
   words: WhisperWord[],
-  customFillerWords?: string[]
+  customFillerWords?: string[],
+  silenceThreshold?: number
 ): Array<{
   word: string;
   start: number;
@@ -128,9 +129,10 @@ function processTranscript(
     });
 
     // Detect silences: insert a [silence] marker if gap > threshold
+    const threshold = silenceThreshold ?? DEFAULT_SILENCE_THRESHOLD;
     if (i < words.length - 1) {
       const gap = words[i + 1].start - w.end;
-      if (gap >= SILENCE_THRESHOLD) {
+      if (gap >= threshold) {
         transcript.push({
           word: `[silence ${gap.toFixed(1)}s]`,
           start: w.end,
@@ -150,6 +152,7 @@ export const analyzeVideo = action({
     projectId: v.id("projects"),
     language: v.optional(v.string()),
     customFillerWords: v.optional(v.array(v.string())),
+    silenceThreshold: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Check for user's own API key first, then fall back to platform key
@@ -237,7 +240,7 @@ export const analyzeVideo = action({
       // Process the word-level timestamps
       let transcript;
       if (result.words && result.words.length > 0) {
-        transcript = processTranscript(result.words, args.customFillerWords);
+        transcript = processTranscript(result.words, args.customFillerWords, args.silenceThreshold);
       } else if (result.segments && result.segments.length > 0) {
         // Fallback: if no word-level timestamps, create from segments
         const segmentWords: WhisperWord[] = [];
@@ -253,7 +256,7 @@ export const analyzeVideo = action({
             });
           });
         }
-        transcript = processTranscript(segmentWords, args.customFillerWords);
+        transcript = processTranscript(segmentWords, args.customFillerWords, args.silenceThreshold);
       } else {
         // Last resort: single block from full text
         const words = result.text.trim().split(/\s+/);

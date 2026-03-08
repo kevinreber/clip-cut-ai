@@ -167,6 +167,7 @@ export const duplicateProject = mutation({
       status: project.status === "analyzing" ? "ready" : project.status,
       language: project.language,
       customFillerWords: project.customFillerWords,
+      silenceThreshold: project.silenceThreshold,
       createdAt: Date.now(),
     });
   },
@@ -185,6 +186,24 @@ export const updateLanguage = mutation({
       throw new Error("Project not found");
     }
     await ctx.db.patch(args.projectId, { language: args.language });
+  },
+});
+
+export const updateSilenceThreshold = mutation({
+  args: {
+    projectId: v.id("projects"),
+    silenceThreshold: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== userId) {
+      throw new Error("Project not found");
+    }
+    await ctx.db.patch(args.projectId, {
+      silenceThreshold: args.silenceThreshold,
+    });
   },
 });
 
