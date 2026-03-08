@@ -268,3 +268,17 @@ export const deleteExportPreset = mutation({
     await ctx.db.delete(args.id);
   },
 });
+
+export const updateCaptionStyle = mutation({
+  args: {
+    projectId: v.id("projects"),
+    captionStyle: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    await ctx.db.patch(args.projectId, {
+      captionStyle: args.captionStyle,
+    });
+  },
+});

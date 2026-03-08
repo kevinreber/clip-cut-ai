@@ -21,6 +21,9 @@ import { useToast } from "../components/Toast";
 import { AISummary } from "../components/AISummary";
 import { ChapterMarkers } from "../components/ChapterMarkers";
 import { TextBasedEditor } from "../components/TextBasedEditor";
+import { SpeakerDiarization } from "../components/SpeakerDiarization";
+import { ClipExtractor } from "../components/ClipExtractor";
+import { AnimatedCaptions } from "../components/AnimatedCaptions";
 
 export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
@@ -71,6 +74,9 @@ function ProjectEditorContent() {
   const updateSilenceThreshold = useMutation(api.projects.updateSilenceThreshold);
   const generateSummary = useAction(api.aiFeatures.generateSummary);
   const generateChapters = useAction(api.aiFeatures.generateChapters);
+  const identifySpeakers = useAction(api.aiFeatures.identifySpeakers);
+  const extractClips = useAction(api.aiFeatures.extractClips);
+  const updateProject = useMutation(api.projects.updateCaptionStyle);
 
   const effectiveVideoUrl = useVideoCache(project?.videoFileId, videoUrl);
   const {
@@ -117,6 +123,8 @@ function ProjectEditorContent() {
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
   const [generatingSummary, setGeneratingSummary] = useState(false);
   const [generatingChapters, setGeneratingChapters] = useState(false);
+  const [identifyingSpeakers, setIdentifyingSpeakers] = useState(false);
+  const [extractingClips, setExtractingClips] = useState(false);
   const [editorMode, setEditorMode] = useState<"word" | "text">("word");
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSavedTranscriptRef = useRef<string>("");
@@ -635,6 +643,49 @@ function ProjectEditorContent() {
     }
   }, [project, generateChapters, addToast]);
 
+  const handleIdentifySpeakers = useCallback(async () => {
+    if (!project) return;
+    setIdentifyingSpeakers(true);
+    try {
+      await identifySpeakers({ projectId: project._id });
+      addToast("Speakers identified!", "success");
+    } catch (err: any) {
+      const message =
+        err instanceof ConvexError
+          ? (err.data as string)
+          : err.message || "Failed to identify speakers.";
+      addToast(message, "error");
+    } finally {
+      setIdentifyingSpeakers(false);
+    }
+  }, [project, identifySpeakers, addToast]);
+
+  const handleExtractClips = useCallback(async () => {
+    if (!project) return;
+    setExtractingClips(true);
+    try {
+      await extractClips({ projectId: project._id });
+      addToast("Clips extracted!", "success");
+    } catch (err: any) {
+      const message =
+        err instanceof ConvexError
+          ? (err.data as string)
+          : err.message || "Failed to extract clips.";
+      addToast(message, "error");
+    } finally {
+      setExtractingClips(false);
+    }
+  }, [project, extractClips, addToast]);
+
+  const handleCaptionStyleChange = useCallback(
+    (style: string) => {
+      if (project) {
+        updateProject({ projectId: project._id, captionStyle: style });
+      }
+    },
+    [project, updateProject]
+  );
+
   if (!project) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
@@ -642,6 +693,19 @@ function ProjectEditorContent() {
       </div>
     );
   }
+
+  // Build speaker color map for word-level highlighting
+  const speakerColorMap = useMemo(() => {
+    const map = new Map<number, string>();
+    if (project?.speakers) {
+      for (const speaker of project.speakers) {
+        for (const idx of speaker.wordIndices) {
+          map.set(idx, speaker.color);
+        }
+      }
+    }
+    return map;
+  }, [project?.speakers]);
 
   const fillerCount = transcript.filter((w) => w.isFiller && !w.word.startsWith("[silence")).length;
   const deletedCount = transcript.filter((w) => w.isDeleted).length;
@@ -1041,6 +1105,39 @@ function ProjectEditorContent() {
               />
             )}
 
+            {/* Speaker Diarization */}
+            {hasTranscript && (
+              <SpeakerDiarization
+                speakers={project.speakers}
+                onGenerate={handleIdentifySpeakers}
+                isGenerating={identifyingSpeakers}
+                totalWords={transcript.filter((w) => !w.word.startsWith("[silence")).length}
+              />
+            )}
+
+            {/* AI Clip Extraction */}
+            {hasTranscript && (
+              <ClipExtractor
+                clips={project.clips}
+                onGenerate={handleExtractClips}
+                isGenerating={extractingClips}
+                onSeek={seekToTime}
+                currentTime={currentTime}
+                videoDuration={duration}
+              />
+            )}
+
+            {/* Animated Captions */}
+            {hasTranscript && (
+              <AnimatedCaptions
+                transcript={transcript}
+                videoDuration={duration}
+                projectName={project.name}
+                currentCaptionStyle={project.captionStyle}
+                onStyleChange={handleCaptionStyleChange}
+              />
+            )}
+
             {/* Export */}
             {hasTranscript && effectiveVideoUrl && duration > 0 && (
               <ExportButton
@@ -1238,12 +1335,14 @@ function ProjectEditorContent() {
                         word.confidence < 0.7;
                       const isSearchMatch = searchMatchIndices.includes(index);
                       const isCurrentSearchMatch = searchMatchIndices.length > 0 && searchMatchIndices[currentSearchIndex] === index;
+                      const speakerColor = speakerColorMap.get(index);
                       return (
                         <button
                           key={index}
                           onClick={(e) => handleWordClick(index, e)}
                           onDoubleClick={() => toggleWordDeleted(index)}
                           title={`${word.start.toFixed(1)}s - ${word.end.toFixed(1)}s${word.isFiller ? (isSilence ? " (silence)" : " (filler)") : ""}${word.confidence !== undefined ? ` | confidence: ${(word.confidence * 100).toFixed(0)}%` : ""}. Double-click to ${word.isDeleted ? "restore" : "delete"}. Shift+click to select range.`}
+                          style={speakerColor ? { borderLeftColor: speakerColor, borderLeftWidth: "3px", borderLeftStyle: "solid" } : undefined}
                           className={`inline-block rounded px-1.5 py-0.5 text-sm transition-all ${
                             isSelected
                               ? "bg-primary/30 text-white ring-1 ring-primary"

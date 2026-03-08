@@ -169,6 +169,182 @@ If there are no notable quotes, omit that section. Keep it concise and useful.`;
   },
 });
 
+export const identifySpeakers = action({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = await getOpenAIKey(ctx);
+
+    const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
+      id: args.projectId,
+    });
+    if (!project?.transcript || project.transcript.length === 0) {
+      throw new ConvexError("No transcript available. Analyze the video first.");
+    }
+
+    // Build timestamped transcript with word indices for GPT
+    const indexedLines: string[] = [];
+    let currentLine = "";
+    let lineStartIdx = -1;
+    let lineStart = -1;
+
+    const realWords = project.transcript
+      .map((w: TranscriptWord, i: number) => ({ ...w, originalIndex: i }))
+      .filter((w: TranscriptWord & { originalIndex: number }) => !w.word.startsWith("[silence"));
+
+    for (let i = 0; i < realWords.length; i++) {
+      const w = realWords[i];
+      if (lineStartIdx < 0) {
+        lineStartIdx = w.originalIndex;
+        lineStart = w.start;
+      }
+      currentLine += (currentLine ? " " : "") + w.word;
+
+      const wordCount = currentLine.split(/\s+/).length;
+      if (wordCount >= 20 || i === realWords.length - 1) {
+        const ts = formatTs(lineStart);
+        indexedLines.push(`[${ts}] (words ${lineStartIdx}-${w.originalIndex}) ${currentLine}`);
+        currentLine = "";
+        lineStartIdx = -1;
+        lineStart = -1;
+      }
+    }
+    const indexedText = indexedLines.join("\n");
+
+    const systemPrompt = `You are an expert at speaker diarization. Given a timestamped transcript with word index ranges, identify distinct speakers and assign word ranges to each speaker.
+
+Rules:
+- Identify 2-6 speakers based on conversation patterns, topic shifts, and speaking styles
+- If it appears to be a single speaker (monologue), return just 1 speaker
+- Assign a descriptive name to each speaker (e.g., "Host", "Guest", "Interviewer", "Speaker 1")
+- Every word range must be assigned to exactly one speaker
+- Use the word index ranges from the transcript to assign ownership
+- Speaker changes typically occur at natural pauses or topic shifts
+
+Respond with ONLY a JSON array, no other text:
+[{"name": "Host", "ranges": [[0, 45], [90, 120]]}, {"name": "Guest", "ranges": [[46, 89], [121, 200]]}]
+
+Each range is [startWordIndex, endWordIndex] inclusive. Only output the JSON array.`;
+
+    const result = await callChatGPT(apiKey, systemPrompt, indexedText);
+
+    let speakersRaw: Array<{ name: string; ranges: number[][] }>;
+    try {
+      const jsonStr = result.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+      speakersRaw = JSON.parse(jsonStr);
+    } catch {
+      throw new ConvexError("Failed to parse speaker data from AI response.");
+    }
+
+    if (!Array.isArray(speakersRaw) || speakersRaw.length === 0) {
+      throw new ConvexError("AI did not identify any speakers.");
+    }
+
+    // Assign colors to speakers
+    const SPEAKER_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
+    const speakers = speakersRaw.map((s, i) => {
+      const wordIndices: number[] = [];
+      for (const [start, end] of s.ranges) {
+        for (let idx = start; idx <= end && idx < project.transcript!.length; idx++) {
+          wordIndices.push(idx);
+        }
+      }
+      return {
+        name: s.name,
+        color: SPEAKER_COLORS[i % SPEAKER_COLORS.length],
+        wordIndices,
+      };
+    });
+
+    await ctx.runMutation(internal.aiFeatureHelpers.saveSpeakers, {
+      projectId: args.projectId,
+      speakers,
+    });
+
+    return { success: true, speakerCount: speakers.length };
+  },
+});
+
+export const extractClips = action({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = await getOpenAIKey(ctx);
+
+    const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
+      id: args.projectId,
+    });
+    if (!project?.transcript || project.transcript.length === 0) {
+      throw new ConvexError("No transcript available. Analyze the video first.");
+    }
+
+    const timestampedText = transcriptToTimestampedText(project.transcript);
+
+    const systemPrompt = `You are an expert at identifying the best clips from video content for social media (TikTok, Reels, Shorts).
+
+Given a timestamped transcript, find the 3-6 best clips. Each clip should be:
+- 15-90 seconds long (ideal for short-form social media)
+- A complete thought or story (don't cut mid-sentence)
+- Engaging, insightful, funny, or emotionally compelling
+- Self-contained (makes sense without additional context)
+
+For each clip, provide:
+- title: A catchy title (3-8 words)
+- description: Why this clip is compelling (1 sentence)
+- start: Start time in seconds
+- end: End time in seconds
+- score: Quality score 1-10 (10 = viral potential)
+- tags: 1-3 content tags (e.g., "funny", "insightful", "educational")
+
+Respond with ONLY a JSON array, no other text:
+[{"title": "The Key Insight", "description": "A compelling moment where...", "start": 30.5, "end": 75.2, "score": 8, "tags": ["insightful", "educational"]}]
+
+Only output the JSON array.`;
+
+    const result = await callChatGPT(apiKey, systemPrompt, timestampedText);
+
+    let clipsRaw: Array<{
+      title: string;
+      description: string;
+      start: number;
+      end: number;
+      score: number;
+      tags: string[];
+    }>;
+    try {
+      const jsonStr = result.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+      clipsRaw = JSON.parse(jsonStr);
+    } catch {
+      throw new ConvexError("Failed to parse clip data from AI response.");
+    }
+
+    if (!Array.isArray(clipsRaw) || clipsRaw.length === 0) {
+      throw new ConvexError("AI did not identify any clips.");
+    }
+
+    // Sort by score descending
+    const clips = clipsRaw
+      .map((c) => ({
+        title: c.title,
+        description: c.description,
+        start: c.start,
+        end: c.end,
+        score: Math.min(10, Math.max(1, c.score)),
+        tags: c.tags || [],
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    await ctx.runMutation(internal.aiFeatureHelpers.saveClips, {
+      projectId: args.projectId,
+      clips,
+    });
+
+    return { success: true, clipCount: clips.length };
+  },
+});
+
 export const generateChapters = action({
   args: {
     projectId: v.id("projects"),

@@ -10,6 +10,9 @@ import { useVideoPlayer } from "../lib/use-video-player";
 import { useToast } from "../components/Toast";
 import { ThemeToggleButton } from "../components/ThemeToggle";
 import { TextBasedEditor } from "../components/TextBasedEditor";
+import { SpeakerDiarization } from "../components/SpeakerDiarization";
+import { ClipExtractor } from "../components/ClipExtractor";
+import { AnimatedCaptions } from "../components/AnimatedCaptions";
 import {
   generateSrt,
   generateVtt,
@@ -711,6 +714,37 @@ function DemoPage() {
 
             {/* Filler Word Frequency Chart */}
             <FillerWordChart transcript={transcript} />
+
+            {/* Speaker Diarization (demo — no backend, UI only) */}
+            <SpeakerDiarization
+              speakers={undefined}
+              onGenerate={async () => {
+                addToast("Speaker identification requires a project with an API key.", "info");
+              }}
+              isGenerating={false}
+              totalWords={transcript.filter((w) => !w.word.startsWith("[silence")).length}
+            />
+
+            {/* AI Clip Extraction (demo — no backend, UI only) */}
+            <ClipExtractor
+              clips={undefined}
+              onGenerate={async () => {
+                addToast("Clip extraction requires a project with an API key.", "info");
+              }}
+              isGenerating={false}
+              onSeek={seekToTime}
+              currentTime={currentTime}
+              videoDuration={duration}
+            />
+
+            {/* Animated Captions */}
+            <AnimatedCaptions
+              transcript={transcript}
+              videoDuration={duration}
+              projectName="demo"
+              currentCaptionStyle={undefined}
+              onStyleChange={() => {}}
+            />
 
             {/* Subtitle Export (demo mode - no video export) */}
             <div className="mt-4">

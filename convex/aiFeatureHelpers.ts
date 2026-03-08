@@ -32,3 +32,42 @@ export const saveChapters = internalMutation({
     });
   },
 });
+
+export const saveSpeakers = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    speakers: v.array(
+      v.object({
+        name: v.string(),
+        color: v.string(),
+        wordIndices: v.array(v.number()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.projectId, {
+      speakers: args.speakers,
+    });
+  },
+});
+
+export const saveClips = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    clips: v.array(
+      v.object({
+        title: v.string(),
+        description: v.string(),
+        start: v.number(),
+        end: v.number(),
+        score: v.number(),
+        tags: v.array(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.projectId, {
+      clips: args.clips,
+    });
+  },
+});
