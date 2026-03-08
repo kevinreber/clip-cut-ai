@@ -1,5 +1,6 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
+import { Link } from "@tanstack/react-router";
 import { api } from "../../convex/_generated/api";
 import { ThemeToggleButton } from "./ThemeToggle";
 
@@ -12,6 +13,12 @@ export function UserMenu() {
   return (
     <div className="flex items-center gap-3">
       <ThemeToggleButton />
+      <Link
+        to="/settings"
+        className="rounded-md bg-surface-lighter px-3 py-1 text-sm text-text-muted transition-colors hover:text-white"
+      >
+        Settings
+      </Link>
       <span className="text-sm text-text-muted">{user.email}</span>
       <button
         onClick={() => signOut()}
