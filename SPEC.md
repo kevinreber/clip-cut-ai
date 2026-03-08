@@ -132,7 +132,7 @@ A running list of potential new features, organized by category. Items are unche
 - [ ] **Team workspaces** — Organization-level accounts with shared project libraries and member roles.
 
 ### UX & Quality of Life
-- [ ] **Auto-save** — Periodically save transcript edits in the background (every 30s or on significant change) so users never lose work.
+- [ ] **Auto-save** — Add periodic background saves (every 30s) with a visual save indicator. *(Partial: transcript already syncs reactively on change, but lacks a timer-based safety net and save status UI.)*
 - [ ] **Version history** — Browse and restore previous edit states of a project, beyond the in-session undo/redo stack.
 - [ ] **Project folders/tags** — Organize projects into folders or apply tags for better library management.
 - [ ] **Batch processing** — Upload multiple videos and apply a "clean all fillers + silences" preset to all of them in one go.
