@@ -9,6 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Transcript Search & Replace — search for words/phrases across the transcript with prev/next navigation, bulk delete, and bulk restore of matches
+- Confidence-Based Auto-Delete Threshold — adjustable confidence slider to auto-delete low-confidence words flagged by Whisper (visible when Confidence mode is on)
+- Smart Silence Shortener — shorten silences to a configurable target duration (e.g., 2s to 0.5s) instead of removing them entirely, preserving natural pacing
+- Search available on all editor pages (project editor, demo, and free trial)
+- Keyboard shortcuts: Ctrl+F to focus search, F3/Shift+F3 to navigate between search matches
 - Features roadmap document with 20 planned features across 3 tiers
 - Changelog page (`/changelog`) for users to see what's new
 - `CLAUDE.md` project instructions for contributors
