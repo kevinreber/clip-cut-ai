@@ -57,12 +57,15 @@ export function computeKeptSegments(
   return merged;
 }
 
-export type ExportQuality = "fast" | "balanced" | "high";
+export type ExportQuality = "original" | "fast" | "balanced" | "high";
 
-const QUALITY_PRESETS: Record<ExportQuality, { preset: string; crf: string }> = {
-  fast: { preset: "ultrafast", crf: "28" },
-  balanced: { preset: "medium", crf: "23" },
-  high: { preset: "slow", crf: "18" },
+const QUALITY_PRESETS: Record<
+  Exclude<ExportQuality, "original">,
+  { preset: string; crf: string; audioBitrate: string }
+> = {
+  fast: { preset: "ultrafast", crf: "28", audioBitrate: "128k" },
+  balanced: { preset: "medium", crf: "23", audioBitrate: "192k" },
+  high: { preset: "slow", crf: "18", audioBitrate: "256k" },
 };
 
 export async function exportVideo(
@@ -105,13 +108,29 @@ export async function exportVideo(
   const videoData = await fetchFile(videoUrl);
   await ffmpeg.writeFile("input.mp4", videoData);
 
-  const { preset, crf } = QUALITY_PRESETS[quality];
+  // "original" uses stream copy (no re-encoding) for maximum quality.
+  // Cuts snap to the nearest keyframe, so there may be slight imprecision
+  // at edit boundaries, but the video/audio quality is perfectly preserved.
+  const useStreamCopy = quality === "original";
 
-  // Build a concat filter for the segments
-  if (segments.length === 1) {
-    // Simple trim
-    const seg = segments[0];
-    await ffmpeg.exec([
+  function buildSegmentArgs(seg: Segment, outputName: string): string[] {
+    if (useStreamCopy) {
+      return [
+        "-i",
+        "input.mp4",
+        "-ss",
+        seg.start.toFixed(3),
+        "-to",
+        seg.end.toFixed(3),
+        "-c",
+        "copy",
+        "-avoid_negative_ts",
+        "make_zero",
+        outputName,
+      ];
+    }
+    const { preset, crf, audioBitrate } = QUALITY_PRESETS[quality];
+    return [
       "-i",
       "input.mp4",
       "-ss",
@@ -124,12 +143,25 @@ export async function exportVideo(
       preset,
       "-crf",
       crf,
+      "-pix_fmt",
+      "yuv420p",
       "-c:a",
       "aac",
+      "-b:a",
+      audioBitrate,
+      "-movflags",
+      "+faststart",
       "-avoid_negative_ts",
       "make_zero",
-      "output.mp4",
-    ]);
+      outputName,
+    ];
+  }
+
+  // Build a concat filter for the segments
+  if (segments.length === 1) {
+    // Simple trim
+    const seg = segments[0];
+    await ffmpeg.exec(buildSegmentArgs(seg, "output.mp4"));
   } else {
     // Use concat demuxer: trim each segment then concatenate
     // Write individual segment files
@@ -140,25 +172,7 @@ export async function exportVideo(
         percent: 5 + Math.round((i / segments.length) * 70),
         message: `Trimming segment ${i + 1} of ${segments.length}...`,
       });
-      await ffmpeg.exec([
-        "-i",
-        "input.mp4",
-        "-ss",
-        seg.start.toFixed(3),
-        "-to",
-        seg.end.toFixed(3),
-        "-c:v",
-        "libx264",
-        "-preset",
-        preset,
-        "-crf",
-        crf,
-        "-c:a",
-        "aac",
-        "-avoid_negative_ts",
-        "make_zero",
-        `seg_${i}.mp4`,
-      ]);
+      await ffmpeg.exec(buildSegmentArgs(seg, `seg_${i}.mp4`));
     }
 
     onProgress({
@@ -182,6 +196,8 @@ export async function exportVideo(
       "concat.txt",
       "-c",
       "copy",
+      "-movflags",
+      "+faststart",
       "output.mp4",
     ]);
   }
