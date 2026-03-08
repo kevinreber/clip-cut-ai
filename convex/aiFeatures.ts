@@ -1,0 +1,235 @@
+"use node";
+
+import { v, ConvexError } from "convex/values";
+import { action } from "./_generated/server";
+import { internal } from "./_generated/api";
+
+interface TranscriptWord {
+  word: string;
+  start: number;
+  end: number;
+  isFiller: boolean;
+  isDeleted: boolean;
+  confidence?: number;
+}
+
+function transcriptToText(transcript: TranscriptWord[]): string {
+  return transcript
+    .filter((w) => !w.word.startsWith("[silence"))
+    .map((w) => w.word)
+    .join(" ");
+}
+
+function transcriptToTimestampedText(transcript: TranscriptWord[]): string {
+  const lines: string[] = [];
+  let currentLine = "";
+  let lineStart = -1;
+
+  for (const w of transcript) {
+    if (w.word.startsWith("[silence")) continue;
+
+    if (lineStart < 0) lineStart = w.start;
+    currentLine += (currentLine ? " " : "") + w.word;
+
+    // Break into ~15-word lines for context
+    const wordCount = currentLine.split(/\s+/).length;
+    if (wordCount >= 15) {
+      const ts = formatTs(lineStart);
+      lines.push(`[${ts}] ${currentLine}`);
+      currentLine = "";
+      lineStart = -1;
+    }
+  }
+  if (currentLine) {
+    lines.push(`[${formatTs(lineStart)}] ${currentLine}`);
+  }
+  return lines.join("\n");
+}
+
+function formatTs(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+async function getOpenAIKey(ctx: any): Promise<string> {
+  let apiKey: string | null = null;
+
+  const identity = await ctx.auth.getUserIdentity();
+  if (identity) {
+    const userKey = await ctx.runQuery(
+      internal.userApiKeysHelpers.getApiKeyByUserId,
+      { userId: identity.subject }
+    );
+    if (userKey) apiKey = userKey;
+  }
+
+  if (!apiKey) {
+    apiKey = process.env.OPENAI_API_KEY ?? null;
+  }
+
+  if (!apiKey) {
+    throw new ConvexError(
+      "No OpenAI API key available. Add your own key in Settings, or contact the site admin."
+    );
+  }
+
+  return apiKey;
+}
+
+async function callChatGPT(
+  apiKey: string,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.3,
+      max_tokens: 2000,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new ConvexError(
+      `OpenAI API error (${response.status}): ${errorText}`
+    );
+  }
+
+  const result = await response.json();
+  return result.choices?.[0]?.message?.content ?? "";
+}
+
+export const generateSummary = action({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = await getOpenAIKey(ctx);
+
+    const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
+      id: args.projectId,
+    });
+    if (!project?.transcript || project.transcript.length === 0) {
+      throw new ConvexError("No transcript available. Analyze the video first.");
+    }
+
+    const text = transcriptToText(project.transcript);
+
+    const systemPrompt = `You are an expert content summarizer. Given a video transcript, generate:
+1. A concise summary (2-4 sentences)
+2. Show notes in markdown format with:
+   - Key Topics (bulleted list)
+   - Key Takeaways (bulleted list)
+   - Notable Quotes (if any interesting quotes appear, bulleted list with the quote)
+
+Format your response exactly as:
+## Summary
+<summary text>
+
+## Key Topics
+- <topic 1>
+- <topic 2>
+...
+
+## Key Takeaways
+- <takeaway 1>
+- <takeaway 2>
+...
+
+## Notable Quotes
+- "<quote>"
+...
+
+If there are no notable quotes, omit that section. Keep it concise and useful.`;
+
+    const result = await callChatGPT(apiKey, systemPrompt, text);
+
+    // Extract summary (first section) and full show notes
+    const summaryMatch = result.match(/## Summary\s*\n([\s\S]*?)(?=\n## |$)/);
+    const summary = summaryMatch ? summaryMatch[1].trim() : result.split("\n\n")[0];
+
+    await ctx.runMutation(internal.aiFeatureHelpers.saveSummary, {
+      projectId: args.projectId,
+      summary,
+      showNotes: result,
+    });
+
+    return { success: true };
+  },
+});
+
+export const generateChapters = action({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = await getOpenAIKey(ctx);
+
+    const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
+      id: args.projectId,
+    });
+    if (!project?.transcript || project.transcript.length === 0) {
+      throw new ConvexError("No transcript available. Analyze the video first.");
+    }
+
+    const timestampedText = transcriptToTimestampedText(project.transcript);
+
+    const systemPrompt = `You are an expert at creating video chapters. Given a timestamped transcript, identify logical topic boundaries and create chapters.
+
+Rules:
+- Create 3-8 chapters depending on content length
+- Each chapter title should be concise (3-7 words)
+- First chapter should start at 0:00
+- Chapters should represent meaningful topic shifts, not arbitrary time divisions
+- Use the timestamps from the transcript to set accurate start times
+
+Respond with ONLY a JSON array, no other text:
+[{"title": "Introduction", "start": 0}, {"title": "Chapter Title", "start": 65.2}, ...]
+
+The "start" value should be in seconds (a number). Only output the JSON array.`;
+
+    const result = await callChatGPT(apiKey, systemPrompt, timestampedText);
+
+    // Parse the JSON response
+    let chaptersRaw: Array<{ title: string; start: number }>;
+    try {
+      // Extract JSON from response (handle markdown code blocks)
+      const jsonStr = result.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+      chaptersRaw = JSON.parse(jsonStr);
+    } catch {
+      throw new ConvexError("Failed to parse chapter data from AI response.");
+    }
+
+    if (!Array.isArray(chaptersRaw) || chaptersRaw.length === 0) {
+      throw new ConvexError("AI did not generate valid chapters.");
+    }
+
+    // Calculate end times (each chapter ends where the next begins)
+    const lastWord = project.transcript[project.transcript.length - 1];
+    const videoDuration = lastWord.end;
+
+    const chapters = chaptersRaw.map((ch, i) => ({
+      title: ch.title,
+      start: ch.start,
+      end: i < chaptersRaw.length - 1 ? chaptersRaw[i + 1].start : videoDuration,
+    }));
+
+    await ctx.runMutation(internal.aiFeatureHelpers.saveChapters, {
+      projectId: args.projectId,
+      chapters,
+    });
+
+    return { success: true, chapterCount: chapters.length };
+  },
+});

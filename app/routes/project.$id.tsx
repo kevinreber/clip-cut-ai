@@ -18,6 +18,9 @@ import { useVideoCache } from "../lib/use-video-cache";
 import { AuthForm } from "../components/AuthForm";
 import { UserMenu } from "../components/UserMenu";
 import { useToast } from "../components/Toast";
+import { AISummary } from "../components/AISummary";
+import { ChapterMarkers } from "../components/ChapterMarkers";
+import { TextBasedEditor } from "../components/TextBasedEditor";
 
 export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
@@ -66,6 +69,8 @@ function ProjectEditorContent() {
   const updateLanguage = useMutation(api.projects.updateLanguage);
   const updateCustomFillerWords = useMutation(api.projects.updateCustomFillerWords);
   const updateSilenceThreshold = useMutation(api.projects.updateSilenceThreshold);
+  const generateSummary = useAction(api.aiFeatures.generateSummary);
+  const generateChapters = useAction(api.aiFeatures.generateChapters);
 
   const effectiveVideoUrl = useVideoCache(project?.videoFileId, videoUrl);
   const {
@@ -110,6 +115,9 @@ function ProjectEditorContent() {
   const [confidenceThreshold, setConfidenceThreshold] = useState(0.5);
   const [targetSilenceDuration, setTargetSilenceDuration] = useState(0.5);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [generatingChapters, setGeneratingChapters] = useState(false);
+  const [editorMode, setEditorMode] = useState<"word" | "text">("word");
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSavedTranscriptRef = useRef<string>("");
   const lastClickedIndex = useRef<number | null>(null);
@@ -593,6 +601,40 @@ function ProjectEditorContent() {
     [project, updateCustomFillerWords]
   );
 
+  const handleGenerateSummary = useCallback(async () => {
+    if (!project) return;
+    setGeneratingSummary(true);
+    try {
+      await generateSummary({ projectId: project._id });
+      addToast("Summary generated!", "success");
+    } catch (err: any) {
+      const message =
+        err instanceof ConvexError
+          ? (err.data as string)
+          : err.message || "Failed to generate summary.";
+      addToast(message, "error");
+    } finally {
+      setGeneratingSummary(false);
+    }
+  }, [project, generateSummary, addToast]);
+
+  const handleGenerateChapters = useCallback(async () => {
+    if (!project) return;
+    setGeneratingChapters(true);
+    try {
+      await generateChapters({ projectId: project._id });
+      addToast("Chapters generated!", "success");
+    } catch (err: any) {
+      const message =
+        err instanceof ConvexError
+          ? (err.data as string)
+          : err.message || "Failed to generate chapters.";
+      addToast(message, "error");
+    } finally {
+      setGeneratingChapters(false);
+    }
+  }, [project, generateChapters, addToast]);
+
   if (!project) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
@@ -978,6 +1020,27 @@ function ProjectEditorContent() {
             {/* Filler Word Frequency Chart */}
             {hasTranscript && <FillerWordChart transcript={transcript} />}
 
+            {/* AI Summary & Show Notes */}
+            {hasTranscript && (
+              <AISummary
+                summary={project.summary}
+                showNotes={project.showNotes}
+                onGenerate={handleGenerateSummary}
+                isGenerating={generatingSummary}
+              />
+            )}
+
+            {/* Chapter Markers */}
+            {hasTranscript && (
+              <ChapterMarkers
+                chapters={project.chapters}
+                onGenerate={handleGenerateChapters}
+                isGenerating={generatingChapters}
+                onSeek={seekToTime}
+                currentTime={currentTime}
+              />
+            )}
+
             {/* Export */}
             {hasTranscript && effectiveVideoUrl && duration > 0 && (
               <ExportButton
@@ -995,18 +1058,42 @@ function ProjectEditorContent() {
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-white">Transcript</h2>
                 {hasTranscript && (
-                  <button
-                    onClick={() => setShowConfidence((s) => !s)}
-                    className={`rounded-md px-2 py-0.5 text-xs transition-colors ${
-                      showConfidence
-                        ? "bg-primary text-white"
-                        : "bg-surface-lighter text-text-muted hover:text-white"
-                    }`}
-                    title="Toggle confidence scores"
-                    data-testid="confidence-toggle"
-                  >
-                    Confidence
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex rounded-md bg-surface text-xs" data-testid="editor-mode-toggle">
+                      <button
+                        onClick={() => setEditorMode("word")}
+                        className={`rounded-md px-2 py-0.5 transition-colors ${
+                          editorMode === "word"
+                            ? "bg-primary text-white"
+                            : "text-text-muted hover:text-white"
+                        }`}
+                      >
+                        Word
+                      </button>
+                      <button
+                        onClick={() => setEditorMode("text")}
+                        className={`rounded-md px-2 py-0.5 transition-colors ${
+                          editorMode === "text"
+                            ? "bg-primary text-white"
+                            : "text-text-muted hover:text-white"
+                        }`}
+                      >
+                        Text
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => setShowConfidence((s) => !s)}
+                      className={`rounded-md px-2 py-0.5 text-xs transition-colors ${
+                        showConfidence
+                          ? "bg-primary text-white"
+                          : "bg-surface-lighter text-text-muted hover:text-white"
+                      }`}
+                      title="Toggle confidence scores"
+                      data-testid="confidence-toggle"
+                    >
+                      Confidence
+                    </button>
+                  </div>
                 )}
               </div>
               <p className="mt-1 text-xs text-text-muted">
@@ -1130,6 +1217,13 @@ function ProjectEditorContent() {
                     This may take a minute depending on video length.
                   </p>
                 </div>
+              ) : hasTranscript && editorMode === "text" ? (
+                <TextBasedEditor
+                  transcript={transcript}
+                  onTranscriptChange={setTranscript}
+                  onSeek={seekToTime}
+                  currentTime={currentTime}
+                />
               ) : hasTranscript ? (
                 <>
                   <div className="flex flex-wrap gap-1">

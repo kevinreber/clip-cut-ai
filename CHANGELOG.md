@@ -9,6 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- AI Summary & Show Notes — generate a concise summary, key topics, takeaways, and notable quotes from your transcript using GPT-4o-mini, with one-click copy for show notes
+- Auto-Generated Chapters — AI detects topic boundaries in your transcript and creates chapter markers with timestamps, exportable in YouTube chapter format
+- Text-Based Video Editing — switch between Word and Text editor modes; Text mode groups words into paragraphs that can be dragged to reorder, or deleted/restored as blocks
 - Transcript Search & Replace — search for words/phrases across the transcript with prev/next navigation, bulk delete, and bulk restore of matches
 - Confidence-Based Auto-Delete Threshold — adjustable confidence slider to auto-delete low-confidence words flagged by Whisper (visible when Confidence mode is on)
 - Smart Silence Shortener — shorten silences to a configurable target duration (e.g., 2s to 0.5s) instead of removing them entirely, preserving natural pacing
