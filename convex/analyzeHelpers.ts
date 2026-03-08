@@ -32,6 +32,7 @@ export const saveTranscript = internalMutation({
         end: v.number(),
         isFiller: v.boolean(),
         isDeleted: v.boolean(),
+        confidence: v.optional(v.number()),
       })
     ),
   },

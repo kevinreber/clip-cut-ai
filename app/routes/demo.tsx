@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "../styles.css";
 import { Timeline } from "../components/Timeline";
+import { EditingStats } from "../components/EditingStats";
+import { FillerWordChart } from "../components/FillerWordChart";
 import { computeKeptSegments } from "../lib/video-export";
 import { useUndoRedo } from "../lib/use-undo-redo";
 import { useVideoPlayer } from "../lib/use-video-player";
@@ -158,6 +160,7 @@ function DemoPage() {
   const [previewMode, setPreviewMode] = useState(false);
   const [selection, setSelection] = useState<Set<number>>(new Set());
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showBeforeAfter, setShowBeforeAfter] = useState(false);
   const lastClickedIndex = useRef<number | null>(null);
 
   const keptSegments = useMemo(
@@ -272,6 +275,23 @@ function DemoPage() {
 
   const handleUndo = useCallback(() => undoTranscript(), [undoTranscript]);
   const handleRedo = useCallback(() => redoTranscript(), [redoTranscript]);
+
+  const handleTimelineSelect = useCallback(
+    (start: number, end: number) => {
+      const newSelection = new Set<number>();
+      for (let i = 0; i < transcript.length; i++) {
+        const w = transcript[i];
+        if (w.start >= start && w.end <= end) {
+          newSelection.add(i);
+        }
+      }
+      if (newSelection.size > 0) {
+        setSelection(newSelection);
+        addToast(`${newSelection.size} words selected from timeline`, "info");
+      }
+    },
+    [transcript, addToast]
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -498,6 +518,18 @@ function DemoPage() {
                 >
                   {previewMode ? "Preview On" : "Preview"}
                 </button>
+                <button
+                  onClick={() => setShowBeforeAfter((s) => !s)}
+                  className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                    showBeforeAfter
+                      ? "bg-primary text-white"
+                      : "bg-surface-lighter text-text-muted hover:text-white"
+                  }`}
+                  title="Compare before and after"
+                  data-testid="before-after-btn"
+                >
+                  Compare
+                </button>
               </div>
               {/* Batch Operations */}
               <div className="flex w-full flex-wrap gap-2 border-t border-surface-lighter pt-2">
@@ -531,13 +563,40 @@ function DemoPage() {
               </div>
             </div>
 
+            {/* Before/After Comparison */}
+            {showBeforeAfter && (
+              <div className="mt-3 grid grid-cols-2 gap-3" data-testid="before-after-panel">
+                <div className="rounded-lg border border-surface-lighter bg-surface-light p-3">
+                  <h4 className="mb-2 text-xs font-medium text-text-muted">Before</h4>
+                  <p className="text-sm text-text leading-relaxed">
+                    {transcript.filter((w) => !w.word.startsWith("[silence")).map((w) => w.word).join(" ")}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-success/20 bg-success/5 p-3">
+                  <h4 className="mb-2 text-xs font-medium text-success">After</h4>
+                  <p className="text-sm text-text leading-relaxed">
+                    {transcript.filter((w) => !w.isDeleted && !w.word.startsWith("[silence")).map((w) => w.word).join(" ")}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Editing Stats */}
+            {duration > 0 && (
+              <EditingStats transcript={transcript} duration={duration} />
+            )}
+
             {/* Timeline */}
             <Timeline
               transcript={transcript}
               duration={duration}
               currentTime={currentTime}
               onSeek={seekToTime}
+              onSelectRange={handleTimelineSelect}
             />
+
+            {/* Filler Word Frequency Chart */}
+            <FillerWordChart transcript={transcript} />
 
             {/* Subtitle Export (demo mode - no video export) */}
             <div className="mt-4">

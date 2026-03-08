@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { exportVideo, type ExportProgress, type ExportQuality } from "../lib/video-export";
+import { useState, useCallback, useRef } from "react";
+import { exportVideo, exportAudio, type ExportProgress, type ExportQuality } from "../lib/video-export";
 import {
   generateSrt,
   generateVtt,
@@ -13,6 +13,7 @@ type TranscriptWord = {
   end: number;
   isFiller: boolean;
   isDeleted: boolean;
+  confidence?: number;
 };
 
 type ExportButtonProps = {
@@ -38,26 +39,60 @@ export function ExportButton({
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [quality, setQuality] = useState<ExportQuality>("original");
+  const [exportFormat, setExportFormat] = useState<"video" | "audio">("video");
+  const startTimeRef = useRef<number>(0);
+  const [eta, setEta] = useState<string>("");
 
   const isExporting =
     progress !== null && progress.stage !== "done" && progress.stage !== "error";
 
+  const handleProgressWithEta = useCallback((p: ExportProgress) => {
+    setProgress(p);
+    if (p.percent > 5 && p.stage !== "done" && p.stage !== "error") {
+      const elapsed = Date.now() - startTimeRef.current;
+      const totalEstimate = elapsed / (p.percent / 100);
+      const remaining = totalEstimate - elapsed;
+      if (remaining > 1000) {
+        const secs = Math.ceil(remaining / 1000);
+        setEta(secs > 60 ? `~${Math.ceil(secs / 60)}m remaining` : `~${secs}s remaining`);
+      } else {
+        setEta("Almost done...");
+      }
+    } else {
+      setEta("");
+    }
+  }, []);
+
   const handleExport = useCallback(async () => {
     setError(null);
+    startTimeRef.current = Date.now();
     try {
-      const blob = await exportVideo(
-        videoUrl,
-        transcript,
-        videoDuration,
-        setProgress,
-        quality
-      );
+      let blob: Blob;
+      let filename: string;
+      if (exportFormat === "audio") {
+        blob = await exportAudio(
+          videoUrl,
+          transcript,
+          videoDuration,
+          handleProgressWithEta,
+          quality
+        );
+        filename = `${projectName.replace(/\.[^.]+$/, "")}_audio.mp3`;
+      } else {
+        blob = await exportVideo(
+          videoUrl,
+          transcript,
+          videoDuration,
+          handleProgressWithEta,
+          quality
+        );
+        filename = `${projectName.replace(/\.[^.]+$/, "")}_edited.mp4`;
+      }
 
-      // Trigger download
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${projectName.replace(/\.[^.]+$/, "")}_edited.mp4`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -70,18 +105,25 @@ export function ExportButton({
         message: err.message || "Export failed.",
       });
     }
-  }, [videoUrl, transcript, videoDuration, projectName, quality]);
+  }, [videoUrl, transcript, videoDuration, projectName, quality, exportFormat, handleProgressWithEta]);
 
   const hasDeletedWords = transcript.some((w) => w.isDeleted);
 
   return (
-    <div className="mt-4">
+    <div className="mt-4" data-testid="export-section">
       {/* Progress bar */}
       {progress && progress.stage !== "done" && progress.stage !== "error" && (
         <div className="mb-3 rounded-lg bg-surface p-3">
           <div className="mb-1.5 flex items-center justify-between text-xs">
             <span className="text-text-muted">{progress.message}</span>
-            <span className="font-medium text-white">{progress.percent}%</span>
+            <div className="flex items-center gap-2">
+              {eta && (
+                <span className="text-text-muted" data-testid="export-eta">
+                  {eta}
+                </span>
+              )}
+              <span className="font-medium text-white">{progress.percent}%</span>
+            </div>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-surface-lighter">
             <div
@@ -95,7 +137,7 @@ export function ExportButton({
       {/* Success message */}
       {progress?.stage === "done" && (
         <div className="mb-3 rounded-lg bg-success/10 border border-success/20 p-3 text-sm text-success">
-          Video exported and download started!
+          {exportFormat === "audio" ? "Audio" : "Video"} exported and download started!
         </div>
       )}
 
@@ -106,24 +148,51 @@ export function ExportButton({
         </div>
       )}
 
-      {/* Quality selector */}
+      {/* Format & Quality selectors */}
       {hasDeletedWords && !isExporting && (
-        <div className="mb-3 flex items-center gap-2">
-          <span className="text-xs text-text-muted">Quality:</span>
-          {(Object.keys(QUALITY_LABELS) as ExportQuality[]).map((q) => (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-muted">Format:</span>
             <button
-              key={q}
-              onClick={() => setQuality(q)}
+              onClick={() => setExportFormat("video")}
               className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                quality === q
+                exportFormat === "video"
                   ? "bg-primary text-white"
                   : "bg-surface-lighter text-text-muted hover:text-white"
               }`}
-              title={QUALITY_LABELS[q].desc}
+              data-testid="format-video"
             >
-              {QUALITY_LABELS[q].label}
+              Video (MP4)
             </button>
-          ))}
+            <button
+              onClick={() => setExportFormat("audio")}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                exportFormat === "audio"
+                  ? "bg-primary text-white"
+                  : "bg-surface-lighter text-text-muted hover:text-white"
+              }`}
+              data-testid="format-audio"
+            >
+              Audio (MP3)
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-muted">Quality:</span>
+            {(Object.keys(QUALITY_LABELS) as ExportQuality[]).map((q) => (
+              <button
+                key={q}
+                onClick={() => setQuality(q)}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  quality === q
+                    ? "bg-primary text-white"
+                    : "bg-surface-lighter text-text-muted hover:text-white"
+                }`}
+                title={QUALITY_LABELS[q].desc}
+              >
+                {QUALITY_LABELS[q].label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -141,7 +210,7 @@ export function ExportButton({
         {isExporting
           ? "Exporting..."
           : hasDeletedWords
-            ? `Export Edited Video (${QUALITY_LABELS[quality].label})`
+            ? `Export ${exportFormat === "audio" ? "Audio" : "Edited Video"} (${QUALITY_LABELS[quality].label})`
             : "Delete words to enable export"}
       </button>
 

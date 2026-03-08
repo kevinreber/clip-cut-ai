@@ -7,6 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "../styles.css";
 import { Timeline } from "../components/Timeline";
 import { ExportButton } from "../components/ExportButton";
+import { EditingStats } from "../components/EditingStats";
+import { FillerWordChart } from "../components/FillerWordChart";
+import { CustomFillerWords } from "../components/CustomFillerWords";
+import { LanguageSelect } from "../components/LanguageSelect";
 import { computeKeptSegments } from "../lib/video-export";
 import { useUndoRedo } from "../lib/use-undo-redo";
 import { useVideoPlayer } from "../lib/use-video-player";
@@ -25,6 +29,7 @@ type TranscriptWord = {
   end: number;
   isFiller: boolean;
   isDeleted: boolean;
+  confidence?: number;
 };
 
 function ProjectEditor() {
@@ -57,6 +62,9 @@ function ProjectEditorContent() {
   const updateTranscript = useMutation(api.projects.updateTranscript);
   const analyzeVideo = useAction(api.analyze.analyzeVideo);
   const renameProject = useMutation(api.projects.renameProject);
+  const duplicateProject = useMutation(api.projects.duplicateProject);
+  const updateLanguage = useMutation(api.projects.updateLanguage);
+  const updateCustomFillerWords = useMutation(api.projects.updateCustomFillerWords);
 
   const effectiveVideoUrl = useVideoCache(project?.videoFileId, videoUrl);
   const {
@@ -90,6 +98,10 @@ function ProjectEditorContent() {
   const [renameValue, setRenameValue] = useState("");
   const [selection, setSelection] = useState<Set<number>>(new Set());
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showConfidence, setShowConfidence] = useState(false);
+  const [language, setLanguage] = useState("");
+  const [customFillerWords, setCustomFillerWords] = useState<string[]>([]);
+  const [showBeforeAfter, setShowBeforeAfter] = useState(false);
   const lastClickedIndex = useRef<number | null>(null);
   const { addToast } = useToast();
 
@@ -102,6 +114,8 @@ function ProjectEditorContent() {
           ? project.transcript
           : []
       );
+      setLanguage(project.language || "");
+      setCustomFillerWords(project.customFillerWords || []);
       setInitialized(true);
     }
   }, [project, initialized]);
@@ -126,15 +140,12 @@ function ProjectEditorContent() {
 
     const onTimeUpdate = () => {
       const t = video.currentTime;
-      // Check if current time is inside a deleted region
       const currentSeg = keptSegments.find((s) => t >= s.start - 0.05 && t < s.end);
       if (!currentSeg) {
-        // Find the next kept segment
         const nextSeg = keptSegments.find((s) => s.start > t);
         if (nextSeg) {
           video.currentTime = nextSeg.start;
         } else {
-          // Past all segments, pause
           video.pause();
         }
       }
@@ -148,7 +159,11 @@ function ProjectEditorContent() {
     setAnalyzing(true);
     setAnalyzeError(null);
     try {
-      await analyzeVideo({ projectId: id as Id<"projects"> });
+      await analyzeVideo({
+        projectId: id as Id<"projects">,
+        language: language || undefined,
+        customFillerWords: customFillerWords.length > 0 ? customFillerWords : undefined,
+      });
     } catch (err: any) {
       const message =
         err instanceof ConvexError
@@ -158,7 +173,7 @@ function ProjectEditorContent() {
     } finally {
       setAnalyzing(false);
     }
-  }, [id, analyzeVideo]);
+  }, [id, analyzeVideo, language, customFillerWords]);
 
   const toggleWordDeleted = useCallback(
     (index: number) => {
@@ -195,7 +210,6 @@ function ProjectEditorContent() {
   const handleWordClick = useCallback(
     (index: number, e: React.MouseEvent) => {
       if (e.shiftKey && lastClickedIndex.current !== null) {
-        // Range select
         const start = Math.min(lastClickedIndex.current, index);
         const end = Math.max(lastClickedIndex.current, index);
         const newSelection = new Set<number>();
@@ -206,7 +220,6 @@ function ProjectEditorContent() {
         return;
       }
 
-      // Normal click
       lastClickedIndex.current = index;
       setSelection(new Set());
       const word = transcript[index];
@@ -235,6 +248,24 @@ function ProjectEditorContent() {
     setSelection(new Set());
   }, [selection, setTranscript]);
 
+  // Timeline drag-to-select: select words within the time range
+  const handleTimelineSelect = useCallback(
+    (start: number, end: number) => {
+      const newSelection = new Set<number>();
+      for (let i = 0; i < transcript.length; i++) {
+        const w = transcript[i];
+        if (w.start >= start && w.end <= end) {
+          newSelection.add(i);
+        }
+      }
+      if (newSelection.size > 0) {
+        setSelection(newSelection);
+        addToast(`${newSelection.size} words selected from timeline`, "info");
+      }
+    },
+    [transcript, addToast]
+  );
+
   // Sync undo/redo changes back to Convex
   const syncTranscript = useCallback(
     (t: TranscriptWord[]) => {
@@ -251,7 +282,7 @@ function ProjectEditorContent() {
     redoTranscript();
   }, [redoTranscript]);
 
-  // Persist after undo/redo (using a ref to track previous transcript)
+  // Persist after undo/redo
   const prevTranscriptRef = useRef(transcript);
   useEffect(() => {
     if (prevTranscriptRef.current !== transcript && initialized && transcript.length > 0) {
@@ -263,16 +294,13 @@ function ProjectEditorContent() {
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      // Ignore when typing in an input
       if ((e.target as HTMLElement).tagName === "INPUT") return;
 
-      // Undo: Ctrl+Z / Cmd+Z
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         handleUndo();
         return;
       }
-      // Redo: Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y
       if (
         ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) ||
         ((e.ctrlKey || e.metaKey) && e.key === "y")
@@ -283,31 +311,31 @@ function ProjectEditorContent() {
       }
 
       switch (e.key) {
-        case " ": // Space to play/pause
+        case " ":
           e.preventDefault();
           togglePlayPause();
           break;
-        case "p": // Toggle preview mode
+        case "p":
           if (!e.metaKey && !e.ctrlKey) {
             setPreviewMode((p) => !p);
           }
           break;
-        case "ArrowLeft": // Seek back 5s
+        case "ArrowLeft":
           seekRelative(-5);
           break;
-        case "ArrowRight": // Seek forward 5s
+        case "ArrowRight":
           seekRelative(5);
           break;
-        case "?": // Show shortcuts help
+        case "?":
           setShowShortcuts((s) => !s);
           break;
-        case "]": // Speed up
+        case "]":
           setPlaybackRate(Math.min(4, playbackRate + 0.25));
           break;
-        case "[": // Slow down
+        case "[":
           setPlaybackRate(Math.max(0.25, playbackRate - 0.25));
           break;
-        case "m": // Mute/unmute
+        case "m":
           if (!e.metaKey && !e.ctrlKey) {
             setVolume(volume === 0 ? 1 : 0);
           }
@@ -330,6 +358,35 @@ function ProjectEditorContent() {
     return () => window.removeEventListener("beforeunload", handler);
   }, [hasUnsavedChanges]);
 
+  const handleDuplicate = useCallback(async () => {
+    try {
+      await duplicateProject({ id: project!._id });
+      addToast("Project duplicated!", "success");
+    } catch {
+      addToast("Failed to duplicate project.", "error");
+    }
+  }, [duplicateProject, project, addToast]);
+
+  const handleLanguageChange = useCallback(
+    (lang: string) => {
+      setLanguage(lang);
+      if (project) {
+        updateLanguage({ projectId: project._id, language: lang });
+      }
+    },
+    [project, updateLanguage]
+  );
+
+  const handleCustomFillerWordsUpdate = useCallback(
+    (words: string[]) => {
+      setCustomFillerWords(words);
+      if (project) {
+        updateCustomFillerWords({ projectId: project._id, customFillerWords: words });
+      }
+    },
+    [project, updateCustomFillerWords]
+  );
+
   if (!project) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
@@ -343,11 +400,17 @@ function ProjectEditorContent() {
   const silenceCount = transcript.filter(
     (w) => w.word.startsWith("[silence")
   ).length;
-  const repetitionCount = transcript.filter(
-    (w) => w.isFiller && w.word.startsWith("[rep:")
-  ).length;
   const isAnalyzing = analyzing || project.status === "analyzing";
   const hasTranscript = transcript.length > 0;
+
+  const beforeText = transcript
+    .filter((w) => !w.word.startsWith("[silence"))
+    .map((w) => w.word)
+    .join(" ");
+  const afterText = transcript
+    .filter((w) => !w.isDeleted && !w.word.startsWith("[silence"))
+    .map((w) => w.word)
+    .join(" ");
 
   return (
     <div className="min-h-screen bg-surface">
@@ -400,6 +463,14 @@ function ProjectEditorContent() {
           >
             {project.status}
           </span>
+          <button
+            onClick={handleDuplicate}
+            className="shrink-0 rounded-md bg-surface-lighter px-2 py-1 text-xs text-text-muted transition-colors hover:text-white"
+            title="Duplicate project"
+            data-testid="duplicate-btn"
+          >
+            Duplicate
+          </button>
           <div className="ml-auto hidden sm:block">
             <UserMenu />
           </div>
@@ -513,7 +584,7 @@ function ProjectEditorContent() {
                     <button
                       onClick={handleUndo}
                       disabled={!canUndo}
-                      className="rounded-md bg-surface-lighter px-2.5 py-1 text-sm font-medium text-text-muted transition-colors hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="rounded-md bg-surface-lighter px-2.5 py-1 text-sm font-medium text-text-muted transition-colors hover:text-white disabled:opacity-30"
                       title="Undo (Ctrl+Z)"
                     >
                       &#8630;
@@ -521,7 +592,7 @@ function ProjectEditorContent() {
                     <button
                       onClick={handleRedo}
                       disabled={!canRedo}
-                      className="rounded-md bg-surface-lighter px-2.5 py-1 text-sm font-medium text-text-muted transition-colors hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="rounded-md bg-surface-lighter px-2.5 py-1 text-sm font-medium text-text-muted transition-colors hover:text-white disabled:opacity-30"
                       title="Redo (Ctrl+Shift+Z)"
                     >
                       &#8631;
@@ -536,6 +607,18 @@ function ProjectEditorContent() {
                       title="Preview playback with deleted segments skipped (P)"
                     >
                       {previewMode ? "Preview On" : "Preview"}
+                    </button>
+                    <button
+                      onClick={() => setShowBeforeAfter((s) => !s)}
+                      className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                        showBeforeAfter
+                          ? "bg-primary text-white"
+                          : "bg-surface-lighter text-text-muted hover:text-white"
+                      }`}
+                      title="Compare before and after"
+                      data-testid="before-after-btn"
+                    >
+                      Compare
                     </button>
                   </div>
                   {/* Batch Operations */}
@@ -562,19 +645,22 @@ function ProjectEditorContent() {
                   </div>
                 </>
               ) : (
-                <div className="flex w-full items-center justify-between">
+                <div className="flex w-full items-center justify-between gap-3">
                   <span className="text-sm text-text-muted">
                     {isAnalyzing
                       ? "AI is analyzing your video..."
                       : "No transcript yet. Analyze your video to get started."}
                   </span>
                   {!isAnalyzing && effectiveVideoUrl && (
-                    <button
-                      onClick={handleAnalyze}
-                      className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/80"
-                    >
-                      Analyze Video
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <LanguageSelect value={language} onChange={handleLanguageChange} />
+                      <button
+                        onClick={handleAnalyze}
+                        className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/80"
+                      >
+                        Analyze Video
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -586,6 +672,25 @@ function ProjectEditorContent() {
               </div>
             )}
 
+            {/* Before/After Comparison */}
+            {showBeforeAfter && hasTranscript && (
+              <div className="mt-3 grid grid-cols-2 gap-3" data-testid="before-after-panel">
+                <div className="rounded-lg border border-surface-lighter bg-surface-light p-3">
+                  <h4 className="mb-2 text-xs font-medium text-text-muted">Before</h4>
+                  <p className="text-sm text-text leading-relaxed">{beforeText}</p>
+                </div>
+                <div className="rounded-lg border border-success/20 bg-success/5 p-3">
+                  <h4 className="mb-2 text-xs font-medium text-success">After</h4>
+                  <p className="text-sm text-text leading-relaxed">{afterText}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Editing Stats Summary */}
+            {hasTranscript && duration > 0 && (
+              <EditingStats transcript={transcript} duration={duration} />
+            )}
+
             {/* Timeline */}
             {hasTranscript && duration > 0 && (
               <Timeline
@@ -593,8 +698,12 @@ function ProjectEditorContent() {
                 duration={duration}
                 currentTime={currentTime}
                 onSeek={seekToTime}
+                onSelectRange={handleTimelineSelect}
               />
             )}
+
+            {/* Filler Word Frequency Chart */}
+            {hasTranscript && <FillerWordChart transcript={transcript} />}
 
             {/* Export */}
             {hasTranscript && effectiveVideoUrl && duration > 0 && (
@@ -610,13 +719,40 @@ function ProjectEditorContent() {
           {/* Transcript Panel */}
           <div className="rounded-lg border border-surface-lighter bg-surface-light">
             <div className="border-b border-surface-lighter px-4 py-3">
-              <h2 className="font-semibold text-white">Transcript</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-white">Transcript</h2>
+                {hasTranscript && (
+                  <button
+                    onClick={() => setShowConfidence((s) => !s)}
+                    className={`rounded-md px-2 py-0.5 text-xs transition-colors ${
+                      showConfidence
+                        ? "bg-primary text-white"
+                        : "bg-surface-lighter text-text-muted hover:text-white"
+                    }`}
+                    title="Toggle confidence scores"
+                    data-testid="confidence-toggle"
+                  >
+                    Confidence
+                  </button>
+                )}
+              </div>
               <p className="mt-1 text-xs text-text-muted">
                 {hasTranscript
                   ? "Click to seek. Double-click to delete/restore. Shift+click to select a range."
                   : "Analyze your video to generate a transcript."}
               </p>
             </div>
+
+            {/* Custom Filler Words */}
+            {!hasTranscript && effectiveVideoUrl && !isAnalyzing && (
+              <div className="border-b border-surface-lighter px-4 py-3">
+                <CustomFillerWords
+                  customWords={customFillerWords}
+                  onUpdate={handleCustomFillerWordsUpdate}
+                />
+              </div>
+            )}
+
             <div className="max-h-[40vh] overflow-y-auto p-4 lg:max-h-[60vh]">
               {isAnalyzing ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -638,12 +774,16 @@ function ProjectEditorContent() {
                         currentTime >= word.start && currentTime < word.end;
                       const isSilence = word.word.startsWith("[silence");
                       const isSelected = selection.has(index);
+                      const lowConfidence =
+                        showConfidence &&
+                        word.confidence !== undefined &&
+                        word.confidence < 0.7;
                       return (
                         <button
                           key={index}
                           onClick={(e) => handleWordClick(index, e)}
                           onDoubleClick={() => toggleWordDeleted(index)}
-                          title={`${word.start.toFixed(1)}s - ${word.end.toFixed(1)}s${word.isFiller ? (isSilence ? " (silence)" : " (filler)") : ""}. Double-click to ${word.isDeleted ? "restore" : "delete"}. Shift+click to select range.`}
+                          title={`${word.start.toFixed(1)}s - ${word.end.toFixed(1)}s${word.isFiller ? (isSilence ? " (silence)" : " (filler)") : ""}${word.confidence !== undefined ? ` | confidence: ${(word.confidence * 100).toFixed(0)}%` : ""}. Double-click to ${word.isDeleted ? "restore" : "delete"}. Shift+click to select range.`}
                           className={`inline-block rounded px-1.5 py-0.5 text-sm transition-all ${
                             isSelected
                               ? "bg-primary/30 text-white ring-1 ring-primary"
@@ -654,9 +794,14 @@ function ProjectEditorContent() {
                                   : word.isFiller
                                     ? "bg-filler/20 text-filler hover:bg-filler/30"
                                     : "text-text hover:bg-surface-lighter"
-                          } ${isActive && !isSelected ? "ring-2 ring-primary" : ""}`}
+                          } ${isActive && !isSelected ? "ring-2 ring-primary" : ""} ${lowConfidence ? "border-b-2 border-dashed border-danger/50" : ""}`}
                         >
                           {word.word}
+                          {showConfidence && word.confidence !== undefined && (
+                            <span className="ml-0.5 text-[10px] text-text-muted/50">
+                              {(word.confidence * 100).toFixed(0)}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -726,6 +871,12 @@ function ProjectEditorContent() {
                   <span className="inline-block h-3 w-3 rounded ring-2 ring-primary" />
                   Current
                 </div>
+                {showConfidence && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="inline-block h-3 w-3 rounded border-b-2 border-dashed border-danger/50" />
+                    Low confidence
+                  </div>
+                )}
               </div>
               <div className="mt-2 hidden text-xs text-text-muted/60 sm:block">
                 Press <kbd className="rounded bg-surface-lighter px-1 py-0.5">?</kbd> for all keyboard shortcuts

@@ -215,3 +215,109 @@ export async function exportVideo(
 
   return blob;
 }
+
+export async function exportAudio(
+  videoUrl: string,
+  transcript: TranscriptWord[],
+  videoDuration: number,
+  onProgress: (progress: ExportProgress) => void,
+  quality: ExportQuality = "fast"
+): Promise<Blob> {
+  const segments = computeKeptSegments(transcript, videoDuration);
+
+  if (segments.length === 0) {
+    throw new Error("No segments to export - all content has been deleted.");
+  }
+
+  onProgress({ stage: "loading", percent: 0, message: "Loading FFmpeg..." });
+
+  const ffmpeg = new FFmpeg();
+
+  ffmpeg.on("progress", ({ progress }) => {
+    onProgress({
+      stage: "processing",
+      percent: Math.round(progress * 90) + 5,
+      message: `Extracting audio... ${Math.round(progress * 100)}%`,
+    });
+  });
+
+  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+  });
+
+  onProgress({
+    stage: "processing",
+    percent: 5,
+    message: "Loading video file...",
+  });
+
+  const videoData = await fetchFile(videoUrl);
+  await ffmpeg.writeFile("input.mp4", videoData);
+
+  const audioBitrate = quality === "high" ? "192k" : quality === "balanced" ? "128k" : "96k";
+
+  if (segments.length === 1) {
+    const seg = segments[0];
+    await ffmpeg.exec([
+      "-i", "input.mp4",
+      "-ss", seg.start.toFixed(3),
+      "-to", seg.end.toFixed(3),
+      "-vn",
+      "-acodec", "libmp3lame",
+      "-ab", audioBitrate,
+      "output.mp3",
+    ]);
+  } else {
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      onProgress({
+        stage: "processing",
+        percent: 5 + Math.round((i / segments.length) * 70),
+        message: `Extracting segment ${i + 1} of ${segments.length}...`,
+      });
+      await ffmpeg.exec([
+        "-i", "input.mp4",
+        "-ss", seg.start.toFixed(3),
+        "-to", seg.end.toFixed(3),
+        "-vn",
+        "-acodec", "libmp3lame",
+        "-ab", audioBitrate,
+        `seg_${i}.mp3`,
+      ]);
+    }
+
+    onProgress({
+      stage: "stitching",
+      percent: 80,
+      message: "Stitching audio segments...",
+    });
+
+    const concatList = segments
+      .map((_, i) => `file 'seg_${i}.mp3'`)
+      .join("\n");
+    await ffmpeg.writeFile("concat.txt", concatList);
+
+    await ffmpeg.exec([
+      "-f", "concat",
+      "-safe", "0",
+      "-i", "concat.txt",
+      "-c", "copy",
+      "output.mp3",
+    ]);
+  }
+
+  onProgress({ stage: "stitching", percent: 95, message: "Finalizing..." });
+
+  const outputData = await ffmpeg.readFile("output.mp3");
+  const blob = new Blob([(outputData as any).buffer ?? outputData], {
+    type: "audio/mpeg",
+  });
+
+  await ffmpeg.terminate();
+
+  onProgress({ stage: "done", percent: 100, message: "Audio export complete!" });
+
+  return blob;
+}

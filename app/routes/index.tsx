@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import "../styles.css";
 import { UserMenu } from "../components/UserMenu";
 import { useToast } from "../components/Toast";
@@ -37,6 +37,8 @@ function AuthenticatedHome() {
   const generateUploadUrl = useMutation(api.projects.generateUploadUrl);
   const attachVideo = useMutation(api.projects.attachVideo);
   const deleteProject = useMutation(api.projects.deleteProject);
+  const deleteMultipleProjects = useMutation(api.projects.deleteMultipleProjects);
+  const duplicateProject = useMutation(api.projects.duplicateProject);
   const navigate = useNavigate();
 
   const { addToast } = useToast();
@@ -47,8 +49,44 @@ function AuthenticatedHome() {
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [isDragging, setIsDragging] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
   const pageSize = 12;
+
+  const toggleProjectSelection = useCallback((projectId: string) => {
+    setSelectedProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) {
+        next.delete(projectId);
+      } else {
+        next.add(projectId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleBatchDelete = useCallback(async () => {
+    if (selectedProjects.size === 0) return;
+    try {
+      await deleteMultipleProjects({ ids: Array.from(selectedProjects) as any });
+      addToast(`${selectedProjects.size} project(s) deleted.`, "info");
+      setSelectedProjects(new Set());
+    } catch {
+      addToast("Failed to delete projects.", "error");
+    }
+  }, [selectedProjects, deleteMultipleProjects, addToast]);
+
+  const handleDuplicateProject = useCallback(
+    async (projectId: string) => {
+      try {
+        await duplicateProject({ id: projectId as any });
+        addToast("Project duplicated!", "success");
+      } catch {
+        addToast("Failed to duplicate project.", "error");
+      }
+    },
+    [duplicateProject, addToast]
+  );
 
   const allFilteredProjects = useMemo(() => {
     if (!projects) return [];
@@ -232,13 +270,34 @@ function AuthenticatedHome() {
         {projects && projects.length > 0 && (
           <div>
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-xl font-semibold text-white">
-                Your Projects
-                <span className="ml-2 text-sm font-normal text-text-muted">
-                  ({allFilteredProjects.length}
-                  {searchQuery ? ` of ${projects.length}` : ""})
-                </span>
-              </h3>
+              <div className="flex items-center gap-3">
+                <h3 className="text-xl font-semibold text-white">
+                  Your Projects
+                  <span className="ml-2 text-sm font-normal text-text-muted">
+                    ({allFilteredProjects.length}
+                    {searchQuery ? ` of ${projects.length}` : ""})
+                  </span>
+                </h3>
+                {selectedProjects.size > 0 && (
+                  <div className="flex items-center gap-2" data-testid="batch-actions">
+                    <span className="text-xs text-text-muted">
+                      {selectedProjects.size} selected
+                    </span>
+                    <button
+                      onClick={handleBatchDelete}
+                      className="rounded-md bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                    >
+                      Delete Selected
+                    </button>
+                    <button
+                      onClick={() => setSelectedProjects(new Set())}
+                      className="rounded-md bg-surface-lighter px-2 py-1 text-xs text-text-muted transition-colors hover:text-white"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -262,7 +321,11 @@ function AuthenticatedHome() {
               {filteredProjects.map((project) => (
                 <div
                   key={project._id}
-                  className="group cursor-pointer rounded-lg border border-surface-lighter bg-surface-light p-4 transition-colors hover:border-primary"
+                  className={`group cursor-pointer rounded-lg border bg-surface-light p-4 transition-colors hover:border-primary ${
+                    selectedProjects.has(project._id)
+                      ? "border-primary bg-primary/5"
+                      : "border-surface-lighter"
+                  }`}
                   onClick={() =>
                     navigate({
                       to: "/project/$id",
@@ -271,39 +334,59 @@ function AuthenticatedHome() {
                   }
                 >
                   <div className="mb-2 flex items-center justify-between">
-                    <h4 className="truncate font-medium text-white">
-                      {project.name}
-                    </h4>
-                    {confirmDeleteId === project._id ? (
-                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          className="rounded px-1.5 py-0.5 text-xs bg-danger/20 text-danger hover:bg-danger/30"
-                          onClick={() => {
-                            deleteProject({ id: project._id });
-                            setConfirmDeleteId(null);
-                            addToast("Project deleted.", "info");
-                          }}
-                        >
-                          Delete
-                        </button>
-                        <button
-                          className="rounded px-1.5 py-0.5 text-xs bg-surface-lighter text-text-muted hover:text-white"
-                          onClick={() => setConfirmDeleteId(null)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        className="rounded p-1 text-text-muted opacity-0 transition-opacity hover:bg-surface-lighter hover:text-danger group-hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmDeleteId(project._id);
-                        }}
-                      >
-                        &#10005;
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={selectedProjects.has(project._id)}
+                        onChange={() => toggleProjectSelection(project._id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-3.5 w-3.5 shrink-0 accent-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                        data-testid="project-checkbox"
+                        style={selectedProjects.has(project._id) ? { opacity: 1 } : undefined}
+                      />
+                      <h4 className="truncate font-medium text-white">
+                        {project.name}
+                      </h4>
+                    </div>
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      {confirmDeleteId === project._id ? (
+                        <>
+                          <button
+                            className="rounded px-1.5 py-0.5 text-xs bg-danger/20 text-danger hover:bg-danger/30"
+                            onClick={() => {
+                              deleteProject({ id: project._id });
+                              setConfirmDeleteId(null);
+                              addToast("Project deleted.", "info");
+                            }}
+                          >
+                            Delete
+                          </button>
+                          <button
+                            className="rounded px-1.5 py-0.5 text-xs bg-surface-lighter text-text-muted hover:text-white"
+                            onClick={() => setConfirmDeleteId(null)}
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="rounded p-1 text-text-muted opacity-0 transition-opacity hover:bg-surface-lighter hover:text-primary group-hover:opacity-100"
+                            onClick={() => handleDuplicateProject(project._id)}
+                            title="Duplicate project"
+                            data-testid="duplicate-project-btn"
+                          >
+                            &#8916;
+                          </button>
+                          <button
+                            className="rounded p-1 text-text-muted opacity-0 transition-opacity hover:bg-surface-lighter hover:text-danger group-hover:opacity-100"
+                            onClick={() => setConfirmDeleteId(project._id)}
+                          >
+                            &#10005;
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-text-muted">
                     <span

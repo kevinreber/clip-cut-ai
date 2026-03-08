@@ -85,6 +85,7 @@ export const updateTranscript = mutation({
         end: v.number(),
         isFiller: v.boolean(),
         isDeleted: v.boolean(),
+        confidence: v.optional(v.number()),
       })
     ),
   },
@@ -128,6 +129,122 @@ export const deleteProject = mutation({
     }
     if (project.videoFileId) {
       await ctx.storage.delete(project.videoFileId);
+    }
+    await ctx.db.delete(args.id);
+  },
+});
+
+export const deleteMultipleProjects = mutation({
+  args: { ids: v.array(v.id("projects")) },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    for (const id of args.ids) {
+      const project = await ctx.db.get(id);
+      if (!project || project.userId !== userId) continue;
+      if (project.videoFileId) {
+        await ctx.storage.delete(project.videoFileId);
+      }
+      await ctx.db.delete(id);
+    }
+  },
+});
+
+export const duplicateProject = mutation({
+  args: { id: v.id("projects") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const project = await ctx.db.get(args.id);
+    if (!project || project.userId !== userId) {
+      throw new Error("Project not found");
+    }
+    return await ctx.db.insert("projects", {
+      name: `${project.name} (copy)`,
+      userId,
+      videoFileId: project.videoFileId,
+      transcript: project.transcript,
+      status: project.status === "analyzing" ? "ready" : project.status,
+      language: project.language,
+      customFillerWords: project.customFillerWords,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const updateLanguage = mutation({
+  args: {
+    projectId: v.id("projects"),
+    language: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== userId) {
+      throw new Error("Project not found");
+    }
+    await ctx.db.patch(args.projectId, { language: args.language });
+  },
+});
+
+export const updateCustomFillerWords = mutation({
+  args: {
+    projectId: v.id("projects"),
+    customFillerWords: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== userId) {
+      throw new Error("Project not found");
+    }
+    await ctx.db.patch(args.projectId, {
+      customFillerWords: args.customFillerWords,
+    });
+  },
+});
+
+// Export presets
+export const listExportPresets = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    return await ctx.db
+      .query("exportPresets")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .collect();
+  },
+});
+
+export const saveExportPreset = mutation({
+  args: {
+    name: v.string(),
+    quality: v.string(),
+    format: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    return await ctx.db.insert("exportPresets", {
+      userId,
+      name: args.name,
+      quality: args.quality,
+      format: args.format,
+    });
+  },
+});
+
+export const deleteExportPreset = mutation({
+  args: { id: v.id("exportPresets") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const preset = await ctx.db.get(args.id);
+    if (!preset || preset.userId !== userId) {
+      throw new Error("Preset not found");
     }
     await ctx.db.delete(args.id);
   },

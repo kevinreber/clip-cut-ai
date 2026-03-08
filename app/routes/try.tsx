@@ -8,6 +8,8 @@ import { useUndoRedo } from "../lib/use-undo-redo";
 import { useVideoPlayer } from "../lib/use-video-player";
 import { useToast } from "../components/Toast";
 import { ThemeToggleButton } from "../components/ThemeToggle";
+import { EditingStats } from "../components/EditingStats";
+import { FillerWordChart } from "../components/FillerWordChart";
 
 export const Route = createFileRoute("/try")({
   component: TryPage,
@@ -145,6 +147,7 @@ function TryPage() {
   const [selection, setSelection] = useState<Set<number>>(new Set());
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [showBeforeAfter, setShowBeforeAfter] = useState(false);
   const lastClickedIndex = useRef<number | null>(null);
 
   // Generate transcript once we know the video duration
@@ -297,6 +300,21 @@ function TryPage() {
 
   const handleUndo = useCallback(() => undoTranscript(), [undoTranscript]);
   const handleRedo = useCallback(() => redoTranscript(), [redoTranscript]);
+
+  const handleTimelineSelect = useCallback(
+    (start: number, end: number) => {
+      setTranscript((prev) =>
+        prev.map((w) => {
+          if (w.start >= start && w.end <= end) {
+            return { ...w, isDeleted: true };
+          }
+          return w;
+        })
+      );
+      addToast("Selected range deleted", "success");
+    },
+    [setTranscript, addToast]
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -692,8 +710,48 @@ function TryPage() {
                   >
                     Restore All
                   </button>
+                  <button
+                    onClick={() => setShowBeforeAfter((p) => !p)}
+                    className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                      showBeforeAfter
+                        ? "bg-primary text-white"
+                        : "bg-surface-lighter text-text-muted hover:text-white"
+                    }`}
+                    data-testid="before-after-btn"
+                  >
+                    {showBeforeAfter ? "Hide Compare" : "Compare"}
+                  </button>
                 </div>
               </div>
+            )}
+
+            {/* Before/After Compare */}
+            {showBeforeAfter && hasTranscript && (
+              <div className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="before-after-panel">
+                <div className="rounded-lg border border-surface-lighter bg-surface-light p-3">
+                  <h4 className="mb-2 text-xs font-medium text-text-muted">Before</h4>
+                  <p className="text-sm text-text leading-relaxed">
+                    {transcript.map((w) => w.word).join(" ")}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+                  <h4 className="mb-2 text-xs font-medium text-primary">After</h4>
+                  <p className="text-sm text-text leading-relaxed">
+                    {transcript
+                      .filter((w) => !w.isDeleted)
+                      .map((w) => w.word)
+                      .join(" ")}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Editing Stats & Filler Chart */}
+            {hasTranscript && (
+              <>
+                <EditingStats transcript={transcript} duration={duration} />
+                <FillerWordChart transcript={transcript} />
+              </>
             )}
 
             {/* Timeline */}
@@ -703,6 +761,7 @@ function TryPage() {
                 duration={duration}
                 currentTime={currentTime}
                 onSeek={seekToTime}
+                onSelectRange={handleTimelineSelect}
               />
             )}
 

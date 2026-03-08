@@ -22,6 +22,7 @@ export default defineSchema({
           end: v.number(),
           isFiller: v.boolean(),
           isDeleted: v.boolean(),
+          confidence: v.optional(v.number()),
         })
       )
     ),
@@ -30,6 +31,14 @@ export default defineSchema({
       v.literal("analyzing"),
       v.literal("ready")
     ),
+    language: v.optional(v.string()),
+    customFillerWords: v.optional(v.array(v.string())),
     createdAt: v.number(),
+  }).index("by_userId", ["userId"]),
+  exportPresets: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    quality: v.string(),
+    format: v.string(),
   }).index("by_userId", ["userId"]),
 });
