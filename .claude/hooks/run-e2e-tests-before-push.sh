@@ -2,6 +2,7 @@
 # run-e2e-tests-before-push.sh
 # Runs Playwright E2E tests before pushing to catch regressions on big feature branches.
 # Only triggers on git push commands for non-main branches.
+# Gracefully skips if Playwright or dependencies are not installed.
 
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command')
@@ -19,6 +20,13 @@ if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; then
   exit 0
 fi
 
+# Check if Playwright is available
+cd "$CWD"
+if ! node -e "require.resolve('@playwright/test')" 2>/dev/null; then
+  echo "Playwright not installed, skipping E2E tests." >&2
+  exit 0
+fi
+
 # Check if any test-related, component, route, or convex files were changed since main
 CHANGED_FILES=$(git -C "$CWD" diff --name-only origin/main...HEAD 2>/dev/null)
 
@@ -33,7 +41,6 @@ fi
 echo "Running E2E tests before push..." >&2
 
 # Run Playwright tests (chromium only for speed)
-cd "$CWD"
 if npx playwright test --project=chromium 2>&1; then
   echo "E2E tests passed." >&2
   exit 0
