@@ -1,5 +1,6 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 
 export function AuthForm() {
   const { signIn } = useAuthActions();
@@ -131,6 +132,21 @@ export function AuthForm() {
             )}
           </p>
         </form>
+
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <Link
+            to="/try"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+          >
+            Try free with your own video &rarr;
+          </Link>
+          <Link
+            to="/demo"
+            className="text-sm text-text-muted transition-colors hover:text-primary hover:underline"
+          >
+            or view the interactive demo
+          </Link>
+        </div>
       </div>
     </div>
   );
