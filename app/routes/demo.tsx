@@ -161,6 +161,10 @@ function DemoPage() {
   const [selection, setSelection] = useState<Set<number>>(new Set());
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showBeforeAfter, setShowBeforeAfter] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchMatchIndices, setSearchMatchIndices] = useState<number[]>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const [targetSilenceDuration, setTargetSilenceDuration] = useState(0.5);
   const lastClickedIndex = useRef<number | null>(null);
 
   const keptSegments = useMemo(
@@ -275,6 +279,88 @@ function DemoPage() {
 
   const handleUndo = useCallback(() => undoTranscript(), [undoTranscript]);
   const handleRedo = useCallback(() => redoTranscript(), [redoTranscript]);
+
+  // Search logic
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchMatchIndices([]);
+      return;
+    }
+    const query = searchQuery.toLowerCase().trim();
+    const matches: number[] = [];
+    for (let i = 0; i < transcript.length; i++) {
+      if (transcript[i].word.toLowerCase().includes(query)) {
+        matches.push(i);
+      }
+    }
+    setSearchMatchIndices(matches);
+  }, [searchQuery, transcript]);
+
+  useEffect(() => {
+    setCurrentSearchIndex(0);
+  }, [searchMatchIndices.length]);
+
+  const navigateSearchMatch = useCallback(
+    (direction: "next" | "prev") => {
+      if (searchMatchIndices.length === 0) return;
+      let newIndex = currentSearchIndex;
+      if (direction === "next") {
+        newIndex = (currentSearchIndex + 1) % searchMatchIndices.length;
+      } else {
+        newIndex = (currentSearchIndex - 1 + searchMatchIndices.length) % searchMatchIndices.length;
+      }
+      setCurrentSearchIndex(newIndex);
+      const wordIndex = searchMatchIndices[newIndex];
+      const word = transcript[wordIndex];
+      if (word) seekToTime(word.start);
+    },
+    [searchMatchIndices, currentSearchIndex, transcript, seekToTime]
+  );
+
+  const deleteSearchMatches = useCallback(() => {
+    if (searchMatchIndices.length === 0) return;
+    const matchSet = new Set(searchMatchIndices);
+    setTranscript((prev) =>
+      prev.map((w, i) => (matchSet.has(i) ? { ...w, isDeleted: true } : w))
+    );
+    addToast(`${searchMatchIndices.length} matches deleted`, "success");
+  }, [searchMatchIndices, setTranscript, addToast]);
+
+  const restoreSearchMatches = useCallback(() => {
+    if (searchMatchIndices.length === 0) return;
+    const matchSet = new Set(searchMatchIndices);
+    setTranscript((prev) =>
+      prev.map((w, i) => (matchSet.has(i) ? { ...w, isDeleted: false } : w))
+    );
+    addToast(`${searchMatchIndices.length} matches restored`, "info");
+  }, [searchMatchIndices, setTranscript, addToast]);
+
+  const shortenAllSilences = useCallback(() => {
+    let count = 0;
+    setTranscript((prev) =>
+      prev.map((w) => {
+        if (w.word.startsWith("[silence") && !w.isDeleted) {
+          const originalDuration = w.end - w.start;
+          if (originalDuration > targetSilenceDuration) {
+            count++;
+            const newEnd = w.start + targetSilenceDuration;
+            return {
+              ...w,
+              end: newEnd,
+              word: `[silence ${targetSilenceDuration.toFixed(1)}s]`,
+            };
+          }
+        }
+        return w;
+      })
+    );
+    addToast(
+      count > 0
+        ? `${count} silence${count > 1 ? "s" : ""} shortened to ${targetSilenceDuration.toFixed(1)}s`
+        : "No silences to shorten",
+      count > 0 ? "success" : "info"
+    );
+  }, [targetSilenceDuration, setTranscript, addToast]);
 
   const handleTimelineSelect = useCallback(
     (start: number, end: number) => {
@@ -561,6 +647,32 @@ function DemoPage() {
                   Reset Demo
                 </button>
               </div>
+
+              {/* Smart Silence Shortener */}
+              {silenceCount > 0 && (
+                <div className="flex w-full items-center gap-3 border-t border-surface-lighter pt-2" data-testid="silence-shortener">
+                  <span className="text-xs text-text-muted whitespace-nowrap">Shorten silences to:</span>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="2.0"
+                    step="0.1"
+                    value={targetSilenceDuration}
+                    onChange={(e) => setTargetSilenceDuration(parseFloat(e.target.value))}
+                    className="w-24 accent-primary"
+                  />
+                  <span className="text-xs font-medium text-white tabular-nums w-8">
+                    {targetSilenceDuration.toFixed(1)}s
+                  </span>
+                  <button
+                    onClick={shortenAllSilences}
+                    className="rounded-md bg-primary/20 px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30"
+                    data-testid="shorten-silences-btn"
+                  >
+                    Shorten Silences
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Before/After Comparison */}
@@ -659,6 +771,57 @@ function DemoPage() {
                 Click to seek. Double-click to delete/restore. Shift+click to
                 select a range.
               </p>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="Search transcript..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-md border border-surface-lighter bg-surface px-3 py-1.5 pr-8 text-xs text-white placeholder-text-muted/50 outline-none focus:border-primary"
+                    data-testid="transcript-search"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-xs"
+                    >
+                      &#10005;
+                    </button>
+                  )}
+                </div>
+                {searchMatchIndices.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => navigateSearchMatch("prev")}
+                      className="rounded bg-surface-lighter px-1.5 py-0.5 text-[10px] text-text-muted hover:text-white"
+                    >
+                      &#9650;
+                    </button>
+                    <span className="text-[10px] text-text-muted tabular-nums whitespace-nowrap">
+                      {currentSearchIndex + 1}/{searchMatchIndices.length}
+                    </span>
+                    <button
+                      onClick={() => navigateSearchMatch("next")}
+                      className="rounded bg-surface-lighter px-1.5 py-0.5 text-[10px] text-text-muted hover:text-white"
+                    >
+                      &#9660;
+                    </button>
+                    <button
+                      onClick={deleteSearchMatches}
+                      className="rounded-md bg-danger/20 px-2 py-1 text-[10px] font-medium text-danger transition-colors hover:bg-danger/30 whitespace-nowrap"
+                    >
+                      Delete
+                    </button>
+                    <button
+                      onClick={restoreSearchMatches}
+                      className="rounded-md bg-success/20 px-2 py-1 text-[10px] font-medium text-success transition-colors hover:bg-success/30 whitespace-nowrap"
+                    >
+                      Restore
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="max-h-[40vh] overflow-y-auto p-4 lg:max-h-[60vh]">
               <div className="flex flex-wrap gap-1">
@@ -667,6 +830,8 @@ function DemoPage() {
                     currentTime >= word.start && currentTime < word.end;
                   const isSilence = word.word.startsWith("[silence");
                   const isSelected = selection.has(index);
+                  const isSearchMatch = searchMatchIndices.includes(index);
+                  const isCurrentSearchMatch = searchMatchIndices.length > 0 && searchMatchIndices[currentSearchIndex] === index;
                   return (
                     <button
                       key={index}
@@ -683,7 +848,7 @@ function DemoPage() {
                               : word.isFiller
                                 ? "bg-filler/20 text-filler hover:bg-filler/30"
                                 : "text-text hover:bg-surface-lighter"
-                      } ${isActive && !isSelected ? "ring-2 ring-primary" : ""}`}
+                      } ${isActive && !isSelected ? "ring-2 ring-primary" : ""} ${isCurrentSearchMatch && !isSelected ? "ring-2 ring-warning bg-warning/20" : isSearchMatch && !isSelected ? "ring-1 ring-warning bg-warning/10" : ""}`}
                     >
                       {word.word}
                     </button>
