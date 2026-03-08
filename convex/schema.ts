@@ -34,6 +34,17 @@ export default defineSchema({
     language: v.optional(v.string()),
     customFillerWords: v.optional(v.array(v.string())),
     silenceThreshold: v.optional(v.number()),
+    summary: v.optional(v.string()),
+    showNotes: v.optional(v.string()),
+    chapters: v.optional(
+      v.array(
+        v.object({
+          title: v.string(),
+          start: v.number(),
+          end: v.number(),
+        })
+      )
+    ),
     createdAt: v.number(),
   }).index("by_userId", ["userId"]),
   exportPresets: defineTable({

@@ -9,6 +9,7 @@ import { useUndoRedo } from "../lib/use-undo-redo";
 import { useVideoPlayer } from "../lib/use-video-player";
 import { useToast } from "../components/Toast";
 import { ThemeToggleButton } from "../components/ThemeToggle";
+import { TextBasedEditor } from "../components/TextBasedEditor";
 import {
   generateSrt,
   generateVtt,
@@ -165,6 +166,7 @@ function DemoPage() {
   const [searchMatchIndices, setSearchMatchIndices] = useState<number[]>([]);
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const [targetSilenceDuration, setTargetSilenceDuration] = useState(0.5);
+  const [editorMode, setEditorMode] = useState<"word" | "text">("word");
   const lastClickedIndex = useRef<number | null>(null);
 
   const keptSegments = useMemo(
@@ -766,7 +768,31 @@ function DemoPage() {
           {/* Transcript Panel */}
           <div className="rounded-lg border border-surface-lighter bg-surface-light">
             <div className="border-b border-surface-lighter px-4 py-3">
-              <h2 className="font-semibold text-white">Transcript</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-white">Transcript</h2>
+                <div className="flex rounded-md bg-surface text-xs" data-testid="editor-mode-toggle">
+                  <button
+                    onClick={() => setEditorMode("word")}
+                    className={`rounded-md px-2 py-0.5 transition-colors ${
+                      editorMode === "word"
+                        ? "bg-primary text-white"
+                        : "text-text-muted hover:text-white"
+                    }`}
+                  >
+                    Word
+                  </button>
+                  <button
+                    onClick={() => setEditorMode("text")}
+                    className={`rounded-md px-2 py-0.5 transition-colors ${
+                      editorMode === "text"
+                        ? "bg-primary text-white"
+                        : "text-text-muted hover:text-white"
+                    }`}
+                  >
+                    Text
+                  </button>
+                </div>
+              </div>
               <p className="mt-1 text-xs text-text-muted">
                 Click to seek. Double-click to delete/restore. Shift+click to
                 select a range.
@@ -824,6 +850,15 @@ function DemoPage() {
               </div>
             </div>
             <div className="max-h-[40vh] overflow-y-auto p-4 lg:max-h-[60vh]">
+              {editorMode === "text" ? (
+                <TextBasedEditor
+                  transcript={transcript}
+                  onTranscriptChange={setTranscript}
+                  onSeek={seekToTime}
+                  currentTime={currentTime}
+                />
+              ) : (
+              <>
               <div className="flex flex-wrap gap-1">
                 {transcript.map((word, index) => {
                   const isActive =
@@ -882,6 +917,8 @@ function DemoPage() {
                     &#10005;
                   </button>
                 </div>
+              )}
+              </>
               )}
             </div>
 

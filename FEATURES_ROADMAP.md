@@ -149,12 +149,12 @@ Features that move ClipCut toward a comprehensive AI-native video editor (Descri
 
 | # | Feature | Complexity | Value | Priority |
 |---|---------|-----------|-------|----------|
-| 6 | Transcript Search & Replace | Low | Medium | P0 |
-| 7 | Confidence Threshold | Low | Medium | P0 |
-| 2 | Smart Silence Shortener | Low | High | P0 |
-| 14 | AI Summary & Show Notes | Low-Med | High | P1 |
-| 1 | Auto Chapters | Medium | High | P1 |
-| 12 | Text-Based Editing | Medium | Very High | P1 |
+| 6 | ~~Transcript Search & Replace~~ | Low | Medium | P0 - DONE |
+| 7 | ~~Confidence Threshold~~ | Low | Medium | P0 - DONE |
+| 2 | ~~Smart Silence Shortener~~ | Low | High | P0 - DONE |
+| 14 | ~~AI Summary & Show Notes~~ | Low-Med | High | P1 - DONE |
+| 1 | ~~Auto Chapters~~ | Medium | High | P1 - DONE |
+| 12 | ~~Text-Based Editing~~ | Medium | Very High | P1 - DONE |
 | 9 | Animated Captions | High | Very High | P1 |
 | 8 | AI Clip Extraction | High | Very High | P1 |
 | 3 | Speaker Diarization | Med-High | Very High | P1 |
