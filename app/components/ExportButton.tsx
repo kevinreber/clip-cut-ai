@@ -23,7 +23,8 @@ type ExportButtonProps = {
 };
 
 const QUALITY_LABELS: Record<ExportQuality, { label: string; desc: string }> = {
-  fast: { label: "Fast", desc: "Quickest export, larger file" },
+  original: { label: "Original", desc: "No re-encoding, preserves source quality (fastest)" },
+  fast: { label: "Fast", desc: "Quick re-encode, larger file" },
   balanced: { label: "Balanced", desc: "Good quality, moderate speed" },
   high: { label: "High Quality", desc: "Best quality, slower export" },
 };
@@ -36,7 +37,7 @@ export function ExportButton({
 }: ExportButtonProps) {
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [quality, setQuality] = useState<ExportQuality>("fast");
+  const [quality, setQuality] = useState<ExportQuality>("original");
 
   const isExporting =
     progress !== null && progress.stage !== "done" && progress.stage !== "error";
@@ -151,6 +152,7 @@ export function ExportButton({
             const baseName = projectName.replace(/\.[^.]+$/, "");
             downloadTextFile(generateSrt(transcript), `${baseName}.srt`, "text/srt");
           }}
+          title="SubRip Subtitle — widely supported format for video subtitles with timestamps. Works with most video players and editing software."
           className="flex-1 rounded-lg border border-surface-lighter px-3 py-2 text-xs font-medium text-text-muted transition-colors hover:border-primary hover:text-white"
         >
           Export SRT
@@ -160,6 +162,7 @@ export function ExportButton({
             const baseName = projectName.replace(/\.[^.]+$/, "");
             downloadTextFile(generateVtt(transcript), `${baseName}.vtt`, "text/vtt");
           }}
+          title="Web Video Text Tracks — subtitle format designed for web browsers and HTML5 video. Used by YouTube, web apps, and streaming platforms."
           className="flex-1 rounded-lg border border-surface-lighter px-3 py-2 text-xs font-medium text-text-muted transition-colors hover:border-primary hover:text-white"
         >
           Export VTT
@@ -173,11 +176,15 @@ export function ExportButton({
               "text/plain"
             );
           }}
+          title="Plain text transcript without timestamps. Useful for scripts, notes, or further editing."
           className="flex-1 rounded-lg border border-surface-lighter px-3 py-2 text-xs font-medium text-text-muted transition-colors hover:border-primary hover:text-white"
         >
           Export Text
         </button>
       </div>
+      <p className="mt-1.5 text-center text-[10px] text-text-muted/60">
+        SRT &amp; VTT are subtitle formats with timestamps — SRT works with most video players, VTT is optimized for web
+      </p>
     </div>
   );
 }
