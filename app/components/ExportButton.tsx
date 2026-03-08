@@ -23,7 +23,8 @@ type ExportButtonProps = {
 };
 
 const QUALITY_LABELS: Record<ExportQuality, { label: string; desc: string }> = {
-  fast: { label: "Fast", desc: "Quickest export, larger file" },
+  original: { label: "Original", desc: "No re-encoding, preserves source quality (fastest)" },
+  fast: { label: "Fast", desc: "Quick re-encode, larger file" },
   balanced: { label: "Balanced", desc: "Good quality, moderate speed" },
   high: { label: "High Quality", desc: "Best quality, slower export" },
 };
@@ -36,7 +37,7 @@ export function ExportButton({
 }: ExportButtonProps) {
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [quality, setQuality] = useState<ExportQuality>("fast");
+  const [quality, setQuality] = useState<ExportQuality>("original");
 
   const isExporting =
     progress !== null && progress.stage !== "done" && progress.stage !== "error";
