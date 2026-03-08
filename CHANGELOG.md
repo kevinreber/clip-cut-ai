@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Favicons and app icons for all platforms (browser, iOS, Android, Windows tiles)
 - Transcript Search & Replace — search for words/phrases across the transcript with prev/next navigation, bulk delete, and bulk restore of matches
 - Confidence-Based Auto-Delete Threshold — adjustable confidence slider to auto-delete low-confidence words flagged by Whisper (visible when Confidence mode is on)
 - Smart Silence Shortener — shorten silences to a configurable target duration (e.g., 2s to 0.5s) instead of removing them entirely, preserving natural pacing
