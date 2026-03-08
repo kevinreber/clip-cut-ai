@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Audio Enhancement / Noise Reduction — client-side audio processing using Web Audio API with 3 presets (Clean Podcast, Reduce Background Noise, Normalize Volume) and advanced controls for noise gate, 3-band EQ, compression, and volume normalization
+- AI Rewrite Suggestions — AI analyzes your transcript to find filler-heavy or unclear sections and suggests cleaner rephrasings that you can accept inline, marking original words as deleted
+- Batch Processing — upload multiple videos at once from the dashboard with queue-based processing, progress tracking per video, and automatic transcription analysis
+- E2E test suite for P2 features (audio enhancement, rewrite suggestions, batch processing)
 - Speaker Diarization — AI identifies distinct speakers in your transcript with color-coded labels, word counts, and per-speaker percentage breakdowns shown in the editor
 - AI Clip Extraction — automatically find the best 30-90 second clips from your video for TikTok, Reels, and Shorts, scored by viral potential with content tags
 - Animated Captions — choose from 4 caption styles (Classic, Bold Pop, Karaoke, Minimal) with live preview, and export word-level SRT or styled ASS subtitle files with animation effects
