@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Favicons and app icons for all platforms (browser, iOS, Android, Windows tiles)
 - Features roadmap document with 20 planned features across 3 tiers
 - Changelog page (`/changelog`) for users to see what's new
 - `CLAUDE.md` project instructions for contributors
