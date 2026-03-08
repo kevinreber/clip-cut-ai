@@ -84,5 +84,12 @@ projects: {
 - [x] **Dark/Light theme toggle** - Persistent theme preference with smooth transitions.
 - [x] **Inline delete confirmation** - Replace browser confirm dialogs with inline UI.
 
+### Phase 6: Testing
+- [x] **Playwright e2e setup** - Config with Chromium, Firefox, and mobile Chrome projects.
+- [x] **Auth flow tests** - Sign up, sign in, sign out, error handling, protected routes.
+- [x] **Dashboard tests** - Upload area, search/filter, sort, pagination, inline delete confirmation.
+- [x] **Editor tests** - Navigation, playback controls, keyboard shortcuts modal, transcript panel, rename.
+- [x] **Theme & export tests** - Theme toggle persistence, export quality UI, subtitle export buttons.
+
 ---
 *Project: ClipCut AI | 2026*
