@@ -28,6 +28,7 @@ interface WhisperWord {
   word: string;
   start: number;
   end: number;
+  confidence?: number;
 }
 
 interface WhisperSegment {
@@ -79,13 +80,15 @@ function detectRepetitions(words: WhisperWord[]): Set<number> {
 }
 
 function processTranscript(
-  words: WhisperWord[]
+  words: WhisperWord[],
+  customFillerWords?: string[]
 ): Array<{
   word: string;
   start: number;
   end: number;
   isFiller: boolean;
   isDeleted: boolean;
+  confidence?: number;
 }> {
   const transcript: Array<{
     word: string;
@@ -93,13 +96,27 @@ function processTranscript(
     end: number;
     isFiller: boolean;
     isDeleted: boolean;
+    confidence?: number;
   }> = [];
+
+  // Merge custom filler words with defaults
+  const allFillerWords = new Set(FILLER_WORDS);
+  if (customFillerWords) {
+    for (const w of customFillerWords) {
+      allFillerWords.add(w.toLowerCase().trim());
+    }
+  }
+
+  const isFillerWithCustom = (word: string): boolean => {
+    const normalized = word.toLowerCase().replace(/[^a-z\s]/g, "").trim();
+    return allFillerWords.has(normalized);
+  };
 
   const repetitions = detectRepetitions(words);
 
   for (let i = 0; i < words.length; i++) {
     const w = words[i];
-    const isFiller = isFillerWord(w.word) || repetitions.has(i);
+    const isFiller = isFillerWithCustom(w.word) || repetitions.has(i);
 
     transcript.push({
       word: w.word.trim(),
@@ -107,6 +124,7 @@ function processTranscript(
       end: w.end,
       isFiller,
       isDeleted: false,
+      confidence: w.confidence,
     });
 
     // Detect silences: insert a [silence] marker if gap > threshold
@@ -128,7 +146,11 @@ function processTranscript(
 }
 
 export const analyzeVideo = action({
-  args: { projectId: v.id("projects") },
+  args: {
+    projectId: v.id("projects"),
+    language: v.optional(v.string()),
+    customFillerWords: v.optional(v.array(v.string())),
+  },
   handler: async (ctx, args) => {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -171,6 +193,9 @@ export const analyzeVideo = action({
       formData.append("model", "whisper-1");
       formData.append("response_format", "verbose_json");
       formData.append("timestamp_granularities[]", "word");
+      if (args.language) {
+        formData.append("language", args.language);
+      }
 
       const response = await fetch(
         "https://api.openai.com/v1/audio/transcriptions",
@@ -195,7 +220,7 @@ export const analyzeVideo = action({
       // Process the word-level timestamps
       let transcript;
       if (result.words && result.words.length > 0) {
-        transcript = processTranscript(result.words);
+        transcript = processTranscript(result.words, args.customFillerWords);
       } else if (result.segments && result.segments.length > 0) {
         // Fallback: if no word-level timestamps, create from segments
         const segmentWords: WhisperWord[] = [];
@@ -211,7 +236,7 @@ export const analyzeVideo = action({
             });
           });
         }
-        transcript = processTranscript(segmentWords);
+        transcript = processTranscript(segmentWords, args.customFillerWords);
       } else {
         // Last resort: single block from full text
         const words = result.text.trim().split(/\s+/);

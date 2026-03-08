@@ -39,6 +39,17 @@ body {
   transition: background-color 0.2s, color 0.2s;
 }
 
+/* Ensure all buttons show pointer cursor */
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+[role="button"]:disabled {
+  cursor: not-allowed;
+}
+
 @keyframes slide-in {
   from {
     opacity: 0;

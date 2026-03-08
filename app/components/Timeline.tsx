@@ -1,4 +1,4 @@
-import { useCallback, useRef, useMemo } from "react";
+import { useCallback, useRef, useMemo, useState } from "react";
 import { computeKeptSegments } from "../lib/video-export";
 
 type TranscriptWord = {
@@ -7,6 +7,7 @@ type TranscriptWord = {
   end: number;
   isFiller: boolean;
   isDeleted: boolean;
+  confidence?: number;
 };
 
 type TimelineProps = {
@@ -14,6 +15,7 @@ type TimelineProps = {
   duration: number;
   currentTime: number;
   onSeek: (time: number) => void;
+  onSelectRange?: (start: number, end: number) => void;
 };
 
 export function Timeline({
@@ -21,8 +23,12 @@ export function Timeline({
   duration,
   currentTime,
   onSeek,
+  onSelectRange,
 }: TimelineProps) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const [dragStart, setDragStart] = useState<number | null>(null);
+  const [dragEnd, setDragEnd] = useState<number | null>(null);
+  const isDragging = useRef(false);
 
   const segments = useMemo(
     () => computeKeptSegments(transcript, duration),
@@ -69,15 +75,72 @@ export function Timeline({
     return bars.map((v) => v / maxVal);
   }, [transcript, duration]);
 
+  const getTimeFromEvent = useCallback(
+    (e: React.MouseEvent) => {
+      const track = trackRef.current;
+      if (!track || duration === 0) return 0;
+      const rect = track.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      return pct * duration;
+    },
+    [duration]
+  );
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (!onSelectRange) {
+        // Simple click to seek
+        onSeek(getTimeFromEvent(e));
+        return;
+      }
+      const time = getTimeFromEvent(e);
+      setDragStart(time);
+      setDragEnd(time);
+      isDragging.current = true;
+    },
+    [getTimeFromEvent, onSeek, onSelectRange]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isDragging.current || dragStart === null) return;
+      setDragEnd(getTimeFromEvent(e));
+    },
+    [dragStart, getTimeFromEvent]
+  );
+
+  const handleMouseUp = useCallback(
+    (e: React.MouseEvent) => {
+      if (!isDragging.current || dragStart === null) {
+        return;
+      }
+      isDragging.current = false;
+      const endTime = getTimeFromEvent(e);
+      const start = Math.min(dragStart, endTime);
+      const end = Math.max(dragStart, endTime);
+
+      if (end - start < 0.2) {
+        // Too small, treat as a click
+        onSeek(start);
+      } else if (onSelectRange) {
+        onSelectRange(start, end);
+      }
+      setDragStart(null);
+      setDragEnd(null);
+    },
+    [dragStart, getTimeFromEvent, onSeek, onSelectRange]
+  );
+
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
+      if (onSelectRange) return; // handled by mouse down/up
       const track = trackRef.current;
       if (!track || duration === 0) return;
       const rect = track.getBoundingClientRect();
       const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
       onSeek(pct * duration);
     },
-    [duration, onSeek]
+    [duration, onSeek, onSelectRange]
   );
 
   if (duration === 0) return null;
@@ -88,8 +151,12 @@ export function Timeline({
   const markerInterval = duration <= 30 ? 5 : duration <= 120 ? 10 : duration <= 600 ? 30 : 60;
   const markerCount = Math.floor(duration / markerInterval);
 
+  // Drag selection range
+  const selStart = dragStart !== null && dragEnd !== null ? Math.min(dragStart, dragEnd) : null;
+  const selEnd = dragStart !== null && dragEnd !== null ? Math.max(dragStart, dragEnd) : null;
+
   return (
-    <div className="mt-4 rounded-lg bg-surface-light p-4">
+    <div className="mt-4 rounded-lg bg-surface-light p-4" data-testid="timeline">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-sm font-medium text-white">Timeline</h3>
         <div className="flex gap-4 text-xs text-text-muted">
@@ -117,13 +184,23 @@ export function Timeline({
       {/* Waveform visualization */}
       <div
         ref={trackRef}
-        onClick={handleClick}
-        className="relative h-16 cursor-pointer rounded-md bg-surface overflow-hidden"
+        onClick={!onSelectRange ? handleClick : undefined}
+        onMouseDown={onSelectRange ? handleMouseDown : undefined}
+        onMouseMove={onSelectRange ? handleMouseMove : undefined}
+        onMouseUp={onSelectRange ? handleMouseUp : undefined}
+        onMouseLeave={() => {
+          if (isDragging.current) {
+            isDragging.current = false;
+            setDragStart(null);
+            setDragEnd(null);
+          }
+        }}
+        className="relative h-16 cursor-pointer rounded-md bg-surface overflow-hidden select-none"
+        data-testid="timeline-track"
       >
         {/* Waveform bars */}
         <div className="absolute inset-0 flex items-end">
           {waveformBars.map((amplitude, i) => {
-            const barPct = 100 / waveformBars.length;
             const barTime = (i / waveformBars.length) * duration;
             const isDeleted = deletedSegments.some(
               (s) => barTime >= s.start && barTime < s.end
@@ -172,6 +249,18 @@ export function Timeline({
           />
         ))}
 
+        {/* Drag selection highlight */}
+        {selStart !== null && selEnd !== null && selEnd - selStart > 0.2 && (
+          <div
+            className="absolute top-0 h-full bg-primary/30 border-x-2 border-primary z-10"
+            data-testid="timeline-selection"
+            style={{
+              left: `${(selStart / duration) * 100}%`,
+              width: `${((selEnd - selStart) / duration) * 100}%`,
+            }}
+          />
+        )}
+
         {/* Playhead */}
         <div
           className="absolute top-0 h-full w-0.5 bg-white shadow-[0_0_6px_rgba(255,255,255,0.6)] z-10"
@@ -206,6 +295,12 @@ export function Timeline({
           <span className="inline-block h-2.5 w-4 rounded-sm bg-deleted/40" />
           Cut
         </div>
+        {onSelectRange && (
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2.5 w-4 rounded-sm bg-primary/30 border border-primary" />
+            Drag to select
+          </div>
+        )}
       </div>
     </div>
   );
