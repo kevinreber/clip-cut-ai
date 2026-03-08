@@ -212,6 +212,12 @@ export function LandingPage() {
             >
               Free Trial
             </Link>
+            <Link
+              to="/changelog"
+              className="hidden text-sm text-text-muted transition-colors hover:text-white sm:inline"
+            >
+              Changelog
+            </Link>
             <button
               onClick={() => setShowAuth(true)}
               className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-dark"
@@ -442,6 +448,9 @@ export function LandingPage() {
             </Link>
             <Link to="/try" className="hover:text-white">
               Free Trial
+            </Link>
+            <Link to="/changelog" className="hover:text-white">
+              Changelog
             </Link>
           </div>
         </div>
