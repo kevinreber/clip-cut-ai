@@ -3,9 +3,9 @@ import { useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useMemo, useRef, useState } from "react";
 import "../styles.css";
-import { AuthForm } from "../components/AuthForm";
 import { UserMenu } from "../components/UserMenu";
 import { useToast } from "../components/Toast";
+import { LandingPage } from "../components/LandingPage";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -23,7 +23,7 @@ function HomePage() {
   }
 
   if (!isAuthenticated) {
-    return <AuthForm />;
+    return <LandingPage />;
   }
 
   return <AuthenticatedHome />;
