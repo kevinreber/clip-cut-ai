@@ -1,7 +1,7 @@
 "use node";
 
 import { v, ConvexError } from "convex/values";
-import { action, internalMutation, internalQuery } from "./_generated/server";
+import { action } from "./_generated/server";
 import { internal } from "./_generated/api";
 
 // Filler words to detect in transcript
@@ -139,14 +139,14 @@ export const analyzeVideo = action({
     }
 
     // Set status to analyzing
-    await ctx.runMutation(internal.analyze.setProjectStatus, {
+    await ctx.runMutation(internal.analyzeHelpers.setProjectStatus, {
       projectId: args.projectId,
       status: "analyzing",
     });
 
     try {
       // Get the project to find the video file
-      const project = await ctx.runQuery(internal.analyze.getProject, {
+      const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
         id: args.projectId,
       });
       if (!project || !project.videoFileId) {
@@ -225,7 +225,7 @@ export const analyzeVideo = action({
       }
 
       // Save transcript and set status to ready
-      await ctx.runMutation(internal.analyze.saveTranscript, {
+      await ctx.runMutation(internal.analyzeHelpers.saveTranscript, {
         projectId: args.projectId,
         transcript,
       });
@@ -233,7 +233,7 @@ export const analyzeVideo = action({
       return { success: true, wordCount: transcript.length };
     } catch (error) {
       // On error, reset status to ready so user can retry
-      await ctx.runMutation(internal.analyze.setProjectStatus, {
+      await ctx.runMutation(internal.analyzeHelpers.setProjectStatus, {
         projectId: args.projectId,
         status: "ready",
       });
@@ -247,45 +247,3 @@ export const analyzeVideo = action({
   },
 });
 
-// Internal mutations used by the action
-export const setProjectStatus = internalMutation({
-  args: {
-    projectId: v.id("projects"),
-    status: v.union(
-      v.literal("uploading"),
-      v.literal("analyzing"),
-      v.literal("ready")
-    ),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.projectId, { status: args.status });
-  },
-});
-
-export const getProject = internalQuery({
-  args: { id: v.id("projects") },
-  handler: async (ctx, args) => {
-    return await ctx.db.get(args.id);
-  },
-});
-
-export const saveTranscript = internalMutation({
-  args: {
-    projectId: v.id("projects"),
-    transcript: v.array(
-      v.object({
-        word: v.string(),
-        start: v.number(),
-        end: v.number(),
-        isFiller: v.boolean(),
-        isDeleted: v.boolean(),
-      })
-    ),
-  },
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.projectId, {
-      transcript: args.transcript,
-      status: "ready",
-    });
-  },
-});
