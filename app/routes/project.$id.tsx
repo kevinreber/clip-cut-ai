@@ -24,6 +24,8 @@ import { TextBasedEditor } from "../components/TextBasedEditor";
 import { SpeakerDiarization } from "../components/SpeakerDiarization";
 import { ClipExtractor } from "../components/ClipExtractor";
 import { AnimatedCaptions } from "../components/AnimatedCaptions";
+import { AudioEnhancement } from "../components/AudioEnhancement";
+import { AIRewriteSuggestions } from "../components/AIRewriteSuggestions";
 
 export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
@@ -76,6 +78,7 @@ function ProjectEditorContent() {
   const generateChapters = useAction(api.aiFeatures.generateChapters);
   const identifySpeakers = useAction(api.aiFeatures.identifySpeakers);
   const extractClips = useAction(api.aiFeatures.extractClips);
+  const generateRewriteSuggestions = useAction(api.aiFeatures.generateRewriteSuggestions);
   const updateProject = useMutation(api.projects.updateCaptionStyle);
 
   const effectiveVideoUrl = useVideoCache(project?.videoFileId, videoUrl);
@@ -125,6 +128,7 @@ function ProjectEditorContent() {
   const [generatingChapters, setGeneratingChapters] = useState(false);
   const [identifyingSpeakers, setIdentifyingSpeakers] = useState(false);
   const [extractingClips, setExtractingClips] = useState(false);
+  const [generatingRewrites, setGeneratingRewrites] = useState(false);
   const [editorMode, setEditorMode] = useState<"word" | "text">("word");
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSavedTranscriptRef = useRef<string>("");
@@ -677,6 +681,42 @@ function ProjectEditorContent() {
     }
   }, [project, extractClips, addToast]);
 
+  const handleGenerateRewrites = useCallback(async () => {
+    if (!project) return;
+    setGeneratingRewrites(true);
+    try {
+      await generateRewriteSuggestions({ projectId: project._id });
+      addToast("Rewrite suggestions generated!", "success");
+    } catch (err: any) {
+      const message =
+        err instanceof ConvexError
+          ? (err.data as string)
+          : err.message || "Failed to generate rewrite suggestions.";
+      addToast(message, "error");
+    } finally {
+      setGeneratingRewrites(false);
+    }
+  }, [project, generateRewriteSuggestions, addToast]);
+
+  const handleAcceptRewrite = useCallback(
+    (suggestion: { startIndex: number; endIndex: number }) => {
+      const updated = transcript.map((w, i) => {
+        if (i >= suggestion.startIndex && i <= suggestion.endIndex && !w.word.startsWith("[silence")) {
+          return { ...w, isDeleted: true };
+        }
+        return w;
+      });
+      setTranscript(updated);
+      addToast("Suggestion accepted - original words marked as deleted.", "success");
+    },
+    [transcript, setTranscript, addToast]
+  );
+
+  const handleEnhancedAudio = useCallback((_buffer: AudioBuffer | null) => {
+    // The AudioEnhancement component manages its own state.
+    // In a full implementation, this would feed the enhanced audio into the export pipeline.
+  }, []);
+
   const handleCaptionStyleChange = useCallback(
     (style: string) => {
       if (project) {
@@ -1124,6 +1164,24 @@ function ProjectEditorContent() {
                 onSeek={seekToTime}
                 currentTime={currentTime}
                 videoDuration={duration}
+              />
+            )}
+
+            {/* AI Rewrite Suggestions */}
+            {hasTranscript && (
+              <AIRewriteSuggestions
+                suggestions={project.rewriteSuggestions}
+                onGenerate={handleGenerateRewrites}
+                isGenerating={generatingRewrites}
+                onAccept={handleAcceptRewrite}
+              />
+            )}
+
+            {/* Audio Enhancement */}
+            {hasTranscript && (
+              <AudioEnhancement
+                videoUrl={effectiveVideoUrl}
+                onEnhancedAudio={handleEnhancedAudio}
               />
             )}
 

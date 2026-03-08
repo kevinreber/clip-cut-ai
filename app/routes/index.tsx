@@ -1,11 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useAction, useConvexAuth, useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useCallback, useMemo, useRef, useState } from "react";
 import "../styles.css";
 import { UserMenu } from "../components/UserMenu";
 import { useToast } from "../components/Toast";
 import { LandingPage } from "../components/LandingPage";
+import { BatchProcessing } from "../components/BatchProcessing";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -39,6 +40,7 @@ function AuthenticatedHome() {
   const deleteProject = useMutation(api.projects.deleteProject);
   const deleteMultipleProjects = useMutation(api.projects.deleteMultipleProjects);
   const duplicateProject = useMutation(api.projects.duplicateProject);
+  const analyzeVideo = useAction(api.analyze.analyzeVideo);
   const navigate = useNavigate();
 
   const { addToast } = useToast();
@@ -217,6 +219,28 @@ function AuthenticatedHome() {
             Upload a video and let AI detect ums, uhs, silences, and
             repetitions. Edit your transcript to cut your video.
           </p>
+        </div>
+
+        {/* Batch Processing */}
+        <div className="mb-8 mx-auto max-w-2xl">
+          <BatchProcessing
+            onProjectCreated={() => {
+              addToast("Batch project ready!", "success");
+            }}
+            createProject={async (name: string) => {
+              const id = await createProject({ name });
+              return id as string;
+            }}
+            generateUploadUrl={async () => {
+              return await generateUploadUrl();
+            }}
+            attachVideo={async ({ projectId, storageId }) => {
+              await attachVideo({ projectId: projectId as any, storageId: storageId as any });
+            }}
+            analyzeVideo={async ({ projectId }) => {
+              await analyzeVideo({ projectId: projectId as any });
+            }}
+          />
         </div>
 
         <div className="mb-8 flex justify-center sm:mb-12">

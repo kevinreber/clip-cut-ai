@@ -409,3 +409,120 @@ The "start" value should be in seconds (a number). Only output the JSON array.`;
     return { success: true, chapterCount: chapters.length };
   },
 });
+
+export const generateRewriteSuggestions = action({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = await getOpenAIKey(ctx);
+
+    const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
+      id: args.projectId,
+    });
+    if (!project?.transcript || project.transcript.length === 0) {
+      throw new ConvexError("No transcript available. Analyze the video first.");
+    }
+
+    // Build indexed transcript showing filler-heavy sections
+    const indexedLines: string[] = [];
+    const words = project.transcript;
+    const CHUNK_SIZE = 30;
+
+    for (let i = 0; i < words.length; i += CHUNK_SIZE) {
+      const chunk = words.slice(i, i + CHUNK_SIZE);
+      const fillerCount = chunk.filter(
+        (w: TranscriptWord) => w.isFiller && !w.word.startsWith("[silence")
+      ).length;
+      const text = chunk
+        .filter((w: TranscriptWord) => !w.word.startsWith("[silence"))
+        .map((w: TranscriptWord) => w.word)
+        .join(" ");
+
+      if (text.trim()) {
+        indexedLines.push(
+          `[words ${i}-${Math.min(i + CHUNK_SIZE - 1, words.length - 1)}] (${fillerCount} fillers) ${text}`
+        );
+      }
+    }
+
+    const indexedText = indexedLines.join("\n");
+
+    const systemPrompt = `You are an expert speech coach and transcript editor. Given a transcript with word index ranges and filler counts, find sections that would benefit from rewriting.
+
+Focus on:
+- Sections with heavy filler usage (um, uh, like, you know)
+- Run-on or unclear sentences
+- Repetitive phrasing
+- Sections where the speaker struggled to articulate a point
+
+For each suggestion, provide:
+- startIndex: The word index where the problematic section starts
+- endIndex: The word index where it ends
+- originalText: The exact text from the transcript
+- suggestedText: A cleaner rephrasing that preserves the speaker's intent
+- reason: A brief explanation of why the rewrite is better
+
+Rules:
+- Provide 3-8 suggestions, prioritized by impact
+- Keep the speaker's voice and style — don't make it sound robotic
+- Only suggest rewrites where there's a meaningful improvement
+- The suggestedText should be concise but natural-sounding
+
+Respond with ONLY a JSON array, no other text:
+[{"startIndex": 0, "endIndex": 25, "originalText": "so um like I think that uh", "suggestedText": "I think that", "reason": "Removes filler words for clearer delivery"}]
+
+Only output the JSON array.`;
+
+    const result = await callChatGPT(apiKey, systemPrompt, indexedText);
+
+    let suggestionsRaw: Array<{
+      startIndex: number;
+      endIndex: number;
+      originalText: string;
+      suggestedText: string;
+      reason: string;
+    }>;
+    try {
+      const jsonStr = result
+        .replace(/```json?\s*/g, "")
+        .replace(/```/g, "")
+        .trim();
+      suggestionsRaw = JSON.parse(jsonStr);
+    } catch {
+      throw new ConvexError(
+        "Failed to parse rewrite suggestions from AI response."
+      );
+    }
+
+    if (!Array.isArray(suggestionsRaw)) {
+      throw new ConvexError("AI did not generate valid suggestions.");
+    }
+
+    // Validate and clean suggestions
+    const suggestions = suggestionsRaw
+      .filter(
+        (s) =>
+          typeof s.startIndex === "number" &&
+          typeof s.endIndex === "number" &&
+          s.startIndex >= 0 &&
+          s.endIndex < words.length &&
+          s.originalText &&
+          s.suggestedText
+      )
+      .map((s) => ({
+        startIndex: s.startIndex,
+        endIndex: s.endIndex,
+        originalText: s.originalText,
+        suggestedText: s.suggestedText,
+        reason: s.reason || "Cleaner phrasing",
+      }));
+
+    await ctx.runMutation(internal.aiFeatureHelpers.saveRewriteSuggestions, {
+      projectId: args.projectId,
+      rewriteSuggestions: suggestions,
+    });
+
+    return { success: true, suggestionCount: suggestions.length };
+  },
+});

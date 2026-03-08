@@ -67,6 +67,17 @@ export default defineSchema({
       )
     ),
     captionStyle: v.optional(v.string()),
+    rewriteSuggestions: v.optional(
+      v.array(
+        v.object({
+          startIndex: v.number(),
+          endIndex: v.number(),
+          originalText: v.string(),
+          suggestedText: v.string(),
+          reason: v.string(),
+        })
+      )
+    ),
     createdAt: v.number(),
   }).index("by_userId", ["userId"]),
   exportPresets: defineTable({

@@ -13,6 +13,8 @@ import { TextBasedEditor } from "../components/TextBasedEditor";
 import { SpeakerDiarization } from "../components/SpeakerDiarization";
 import { ClipExtractor } from "../components/ClipExtractor";
 import { AnimatedCaptions } from "../components/AnimatedCaptions";
+import { AIRewriteSuggestions } from "../components/AIRewriteSuggestions";
+import { AudioEnhancement } from "../components/AudioEnhancement";
 import {
   generateSrt,
   generateVtt,
@@ -735,6 +737,22 @@ function DemoPage() {
               onSeek={seekToTime}
               currentTime={currentTime}
               videoDuration={duration}
+            />
+
+            {/* AI Rewrite Suggestions (demo — no backend, UI only) */}
+            <AIRewriteSuggestions
+              suggestions={undefined}
+              onGenerate={async () => {
+                addToast("Rewrite suggestions require a project with an API key.", "info");
+              }}
+              isGenerating={false}
+              onAccept={() => {}}
+            />
+
+            {/* Audio Enhancement */}
+            <AudioEnhancement
+              videoUrl={null}
+              onEnhancedAudio={() => {}}
             />
 
             {/* Animated Captions */}

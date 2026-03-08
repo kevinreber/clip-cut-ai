@@ -71,3 +71,23 @@ export const saveClips = internalMutation({
     });
   },
 });
+
+export const saveRewriteSuggestions = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    rewriteSuggestions: v.array(
+      v.object({
+        startIndex: v.number(),
+        endIndex: v.number(),
+        originalText: v.string(),
+        suggestedText: v.string(),
+        reason: v.string(),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.projectId, {
+      rewriteSuggestions: args.rewriteSuggestions,
+    });
+  },
+});
