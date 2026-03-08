@@ -8,6 +8,10 @@
     "build": "vite build",
     "start": "vite preview",
     "lint": "eslint .",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:chromium": "playwright test --project=chromium",
     "vercel-build": "bash scripts/vercel-build.sh"
   },
   "dependencies": {
@@ -22,6 +26,7 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^25.3.5",
     "@types/react": "^19.0.0",

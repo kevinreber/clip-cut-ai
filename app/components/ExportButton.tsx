@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { exportVideo, type ExportProgress } from "../lib/video-export";
+import { exportVideo, type ExportProgress, type ExportQuality } from "../lib/video-export";
 import {
   generateSrt,
   generateVtt,
@@ -22,6 +22,12 @@ type ExportButtonProps = {
   projectName: string;
 };
 
+const QUALITY_LABELS: Record<ExportQuality, { label: string; desc: string }> = {
+  fast: { label: "Fast", desc: "Quickest export, larger file" },
+  balanced: { label: "Balanced", desc: "Good quality, moderate speed" },
+  high: { label: "High Quality", desc: "Best quality, slower export" },
+};
+
 export function ExportButton({
   videoUrl,
   transcript,
@@ -30,6 +36,7 @@ export function ExportButton({
 }: ExportButtonProps) {
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [quality, setQuality] = useState<ExportQuality>("fast");
 
   const isExporting =
     progress !== null && progress.stage !== "done" && progress.stage !== "error";
@@ -41,7 +48,8 @@ export function ExportButton({
         videoUrl,
         transcript,
         videoDuration,
-        setProgress
+        setProgress,
+        quality
       );
 
       // Trigger download
@@ -61,7 +69,7 @@ export function ExportButton({
         message: err.message || "Export failed.",
       });
     }
-  }, [videoUrl, transcript, videoDuration, projectName]);
+  }, [videoUrl, transcript, videoDuration, projectName, quality]);
 
   const hasDeletedWords = transcript.some((w) => w.isDeleted);
 
@@ -97,6 +105,27 @@ export function ExportButton({
         </div>
       )}
 
+      {/* Quality selector */}
+      {hasDeletedWords && !isExporting && (
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-xs text-text-muted">Quality:</span>
+          {(Object.keys(QUALITY_LABELS) as ExportQuality[]).map((q) => (
+            <button
+              key={q}
+              onClick={() => setQuality(q)}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                quality === q
+                  ? "bg-primary text-white"
+                  : "bg-surface-lighter text-text-muted hover:text-white"
+              }`}
+              title={QUALITY_LABELS[q].desc}
+            >
+              {QUALITY_LABELS[q].label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <button
         onClick={handleExport}
         disabled={isExporting || !hasDeletedWords}
@@ -111,7 +140,7 @@ export function ExportButton({
         {isExporting
           ? "Exporting..."
           : hasDeletedWords
-            ? "Export Edited Video"
+            ? `Export Edited Video (${QUALITY_LABELS[quality].label})`
             : "Delete words to enable export"}
       </button>
 

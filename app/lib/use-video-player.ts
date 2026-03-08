@@ -5,6 +5,8 @@ export function useVideoPlayer(videoUrl: string | null | undefined) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackRate, setPlaybackRateState] = useState(1);
+  const [volume, setVolumeState] = useState(1);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -50,6 +52,22 @@ export function useVideoPlayer(videoUrl: string | null | undefined) {
     }
   }, []);
 
+  const setPlaybackRate = useCallback((rate: number) => {
+    const video = videoRef.current;
+    if (video) {
+      video.playbackRate = rate;
+    }
+    setPlaybackRateState(rate);
+  }, []);
+
+  const setVolume = useCallback((vol: number) => {
+    const video = videoRef.current;
+    if (video) {
+      video.volume = vol;
+    }
+    setVolumeState(vol);
+  }, []);
+
   return {
     videoRef,
     currentTime,
@@ -58,5 +76,9 @@ export function useVideoPlayer(videoUrl: string | null | undefined) {
     seekTo,
     togglePlayPause,
     seekRelative,
+    playbackRate,
+    setPlaybackRate,
+    volume,
+    setVolume,
   };
 }

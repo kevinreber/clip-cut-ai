@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 
+const MAX_HISTORY = 100;
+
 export function useUndoRedo<T>(initial: T) {
   const [state, setState] = useState(initial);
   const pastRef = useRef<T[]>([]);
@@ -8,7 +10,8 @@ export function useUndoRedo<T>(initial: T) {
   const set = useCallback((next: T | ((prev: T) => T)) => {
     setState((prev) => {
       const resolved = typeof next === "function" ? (next as (p: T) => T)(prev) : next;
-      pastRef.current = [...pastRef.current, prev];
+      const newPast = [...pastRef.current, prev];
+      pastRef.current = newPast.length > MAX_HISTORY ? newPast.slice(-MAX_HISTORY) : newPast;
       futureRef.current = [];
       return resolved;
     });

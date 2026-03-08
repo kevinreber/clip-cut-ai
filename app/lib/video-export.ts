@@ -57,11 +57,20 @@ export function computeKeptSegments(
   return merged;
 }
 
+export type ExportQuality = "fast" | "balanced" | "high";
+
+const QUALITY_PRESETS: Record<ExportQuality, { preset: string; crf: string }> = {
+  fast: { preset: "ultrafast", crf: "28" },
+  balanced: { preset: "medium", crf: "23" },
+  high: { preset: "slow", crf: "18" },
+};
+
 export async function exportVideo(
   videoUrl: string,
   transcript: TranscriptWord[],
   videoDuration: number,
-  onProgress: (progress: ExportProgress) => void
+  onProgress: (progress: ExportProgress) => void,
+  quality: ExportQuality = "fast"
 ): Promise<Blob> {
   const segments = computeKeptSegments(transcript, videoDuration);
 
@@ -96,6 +105,8 @@ export async function exportVideo(
   const videoData = await fetchFile(videoUrl);
   await ffmpeg.writeFile("input.mp4", videoData);
 
+  const { preset, crf } = QUALITY_PRESETS[quality];
+
   // Build a concat filter for the segments
   if (segments.length === 1) {
     // Simple trim
@@ -110,7 +121,9 @@ export async function exportVideo(
       "-c:v",
       "libx264",
       "-preset",
-      "ultrafast",
+      preset,
+      "-crf",
+      crf,
       "-c:a",
       "aac",
       "-avoid_negative_ts",
@@ -137,7 +150,9 @@ export async function exportVideo(
         "-c:v",
         "libx264",
         "-preset",
-        "ultrafast",
+        preset,
+        "-crf",
+        crf,
         "-c:a",
         "aac",
         "-avoid_negative_ts",

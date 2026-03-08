@@ -5,3 +5,6 @@ dist/
 .env
 .env.local
 .vercel/output/
+test-results/
+playwright-report/
+blob-report/

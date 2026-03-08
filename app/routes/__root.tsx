@@ -6,6 +6,8 @@ import {
 import { HeadContent, Scripts } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { ConvexClientProvider } from "../convex";
+import { ToastProvider } from "../components/Toast";
+import { ThemeProvider } from "../components/ThemeToggle";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -25,7 +27,11 @@ function RootComponent() {
   return (
     <RootDocument>
       <ConvexClientProvider>
-        <Outlet />
+        <ThemeProvider>
+          <ToastProvider>
+            <Outlet />
+          </ToastProvider>
+        </ThemeProvider>
       </ConvexClientProvider>
     </RootDocument>
   );

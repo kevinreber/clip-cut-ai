@@ -52,6 +52,23 @@ export function Timeline({
     [segments]
   );
 
+  // Compute waveform-like bars based on word density per time bucket
+  const waveformBars = useMemo(() => {
+    if (transcript.length === 0 || duration === 0) return [];
+    const numBars = 100;
+    const bucketSize = duration / numBars;
+    const bars: number[] = new Array(numBars).fill(0);
+
+    for (const word of transcript) {
+      if (word.word.startsWith("[silence")) continue;
+      const bucket = Math.min(Math.floor(word.start / bucketSize), numBars - 1);
+      bars[bucket]++;
+    }
+
+    const maxVal = Math.max(...bars, 1);
+    return bars.map((v) => v / maxVal);
+  }, [transcript, duration]);
+
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       const track = trackRef.current;
@@ -66,6 +83,10 @@ export function Timeline({
   if (duration === 0) return null;
 
   const playheadPct = (currentTime / duration) * 100;
+
+  // Simplified time markers
+  const markerInterval = duration <= 30 ? 5 : duration <= 120 ? 10 : duration <= 600 ? 30 : 60;
+  const markerCount = Math.floor(duration / markerInterval);
 
   return (
     <div className="mt-4 rounded-lg bg-surface-light p-4">
@@ -93,17 +114,43 @@ export function Timeline({
         </div>
       </div>
 
-      {/* Timeline track */}
+      {/* Waveform visualization */}
       <div
         ref={trackRef}
         onClick={handleClick}
-        className="relative h-10 cursor-pointer rounded-md bg-surface overflow-hidden"
+        className="relative h-16 cursor-pointer rounded-md bg-surface overflow-hidden"
       >
-        {/* Kept segments (green) */}
+        {/* Waveform bars */}
+        <div className="absolute inset-0 flex items-end">
+          {waveformBars.map((amplitude, i) => {
+            const barPct = 100 / waveformBars.length;
+            const barTime = (i / waveformBars.length) * duration;
+            const isDeleted = deletedSegments.some(
+              (s) => barTime >= s.start && barTime < s.end
+            );
+            return (
+              <div
+                key={i}
+                className="flex-1"
+                style={{ height: "100%", display: "flex", alignItems: "flex-end" }}
+              >
+                <div
+                  className={`w-full ${isDeleted ? "bg-deleted/40" : "bg-success/50"}`}
+                  style={{
+                    height: `${Math.max(8, amplitude * 100)}%`,
+                    transition: "height 0.15s ease",
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Kept segments overlay (subtle) */}
         {segments.map((seg, i) => (
           <div
             key={`kept-${i}`}
-            className="absolute top-0 h-full bg-success/40"
+            className="absolute top-0 h-full bg-success/10"
             style={{
               left: `${(seg.start / duration) * 100}%`,
               width: `${((seg.end - seg.start) / duration) * 100}%`,
@@ -111,37 +158,37 @@ export function Timeline({
           />
         ))}
 
-        {/* Deleted segments (red striped) */}
+        {/* Deleted segments overlay */}
         {deletedSegments.map((seg, i) => (
           <div
             key={`del-${i}`}
-            className="absolute top-0 h-full bg-deleted/20"
+            className="absolute top-0 h-full"
             style={{
               left: `${(seg.start / duration) * 100}%`,
               width: `${((seg.end - seg.start) / duration) * 100}%`,
               backgroundImage:
-                "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(248,113,113,0.15) 3px, rgba(248,113,113,0.15) 6px)",
+                "repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(248,113,113,0.1) 3px, rgba(248,113,113,0.1) 6px)",
             }}
           />
         ))}
 
         {/* Playhead */}
         <div
-          className="absolute top-0 h-full w-0.5 bg-white shadow-[0_0_4px_rgba(255,255,255,0.5)]"
+          className="absolute top-0 h-full w-0.5 bg-white shadow-[0_0_6px_rgba(255,255,255,0.6)] z-10"
           style={{ left: `${playheadPct}%` }}
         />
 
         {/* Time markers */}
-        {Array.from({ length: Math.min(Math.floor(duration / 10) + 1, 20) }).map((_, i) => {
-          const time = i * Math.ceil(duration / 10 / (Math.min(Math.floor(duration / 10) + 1, 20) - 1)) * 10;
-          if (time > duration) return null;
+        {Array.from({ length: markerCount + 1 }).map((_, i) => {
+          const time = i * markerInterval;
+          if (time > duration || time === 0) return null;
           return (
             <div
               key={`marker-${i}`}
               className="absolute top-0 h-full border-l border-white/10"
               style={{ left: `${(time / duration) * 100}%` }}
             >
-              <span className="absolute bottom-0.5 left-1 text-[10px] text-text-muted">
+              <span className="absolute top-0.5 left-1 text-[10px] text-text-muted/60">
                 {formatTime(time)}
               </span>
             </div>
@@ -152,11 +199,11 @@ export function Timeline({
       {/* Legend */}
       <div className="mt-2 flex gap-4 text-xs text-text-muted">
         <div className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-4 rounded-sm bg-success/40" />
+          <span className="inline-block h-2.5 w-4 rounded-sm bg-success/50" />
           Kept
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="inline-block h-2.5 w-4 rounded-sm bg-deleted/20" />
+          <span className="inline-block h-2.5 w-4 rounded-sm bg-deleted/40" />
           Cut
         </div>
       </div>

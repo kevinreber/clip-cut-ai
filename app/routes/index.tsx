@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import "../styles.css";
 import { AuthForm } from "../components/AuthForm";
 import { UserMenu } from "../components/UserMenu";
+import { useToast } from "../components/Toast";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -38,13 +39,18 @@ function AuthenticatedHome() {
   const deleteProject = useMutation(api.projects.deleteProject);
   const navigate = useNavigate();
 
+  const { addToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [isDragging, setIsDragging] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const pageSize = 12;
 
-  const filteredProjects = useMemo(() => {
+  const allFilteredProjects = useMemo(() => {
     if (!projects) return [];
     let result = projects;
 
@@ -67,9 +73,44 @@ function AuthenticatedHome() {
     });
   }, [projects, searchQuery, sortBy]);
 
+  const totalPages = Math.ceil(allFilteredProjects.length / pageSize);
+  const filteredProjects = useMemo(
+    () => allFilteredProjects.slice(page * pageSize, (page + 1) * pageSize),
+    [allFilteredProjects, page]
+  );
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith("video/")) {
+      processUpload(file);
+    } else {
+      addToast("Please drop a video file (MP4, MOV, WebM).", "warning");
+    }
+  }
+
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    processUpload(file);
+  }
+
+  async function processUpload(file: File) {
+    if (!file.type.startsWith("video/")) {
+      addToast("Please select a video file.", "warning");
+      return;
+    }
 
     setUploading(true);
     setUploadProgress(0);
@@ -110,7 +151,7 @@ function AuthenticatedHome() {
       navigate({ to: "/project/$id", params: { id: projectId } });
     } catch (err) {
       console.error("Upload failed:", err);
-      alert("Upload failed. Please try again.");
+      addToast("Upload failed. Please try again.", "error");
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -142,10 +183,15 @@ function AuthenticatedHome() {
 
         <div className="mb-8 flex justify-center sm:mb-12">
           <label
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             className={`flex w-full max-w-md cursor-pointer flex-col items-center rounded-xl border-2 border-dashed px-8 py-10 transition-colors sm:px-16 sm:py-12 ${
-              uploading
-                ? "border-primary bg-primary/10"
-                : "border-surface-lighter hover:border-primary hover:bg-surface-light"
+              isDragging
+                ? "border-primary bg-primary/20 scale-105"
+                : uploading
+                  ? "border-primary bg-primary/10"
+                  : "border-surface-lighter hover:border-primary hover:bg-surface-light"
             }`}
           >
             <input
@@ -173,10 +219,10 @@ function AuthenticatedHome() {
               <>
                 <div className="mb-4 text-4xl">&#128249;</div>
                 <p className="mb-1 text-lg font-medium text-white">
-                  Upload a video to get started
+                  {isDragging ? "Drop your video here" : "Upload a video to get started"}
                 </p>
                 <p className="text-sm text-text-muted">
-                  MP4, MOV, WebM supported
+                  Drag & drop or click to browse. MP4, MOV, WebM supported.
                 </p>
               </>
             )}
@@ -189,7 +235,7 @@ function AuthenticatedHome() {
               <h3 className="text-xl font-semibold text-white">
                 Your Projects
                 <span className="ml-2 text-sm font-normal text-text-muted">
-                  ({filteredProjects.length}
+                  ({allFilteredProjects.length}
                   {searchQuery ? ` of ${projects.length}` : ""})
                 </span>
               </h3>
@@ -228,17 +274,36 @@ function AuthenticatedHome() {
                     <h4 className="truncate font-medium text-white">
                       {project.name}
                     </h4>
-                    <button
-                      className="rounded p-1 text-text-muted opacity-0 transition-opacity hover:bg-surface-lighter hover:text-danger group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (confirm("Delete this project?")) {
-                          deleteProject({ id: project._id });
-                        }
-                      }}
-                    >
-                      &#10005;
-                    </button>
+                    {confirmDeleteId === project._id ? (
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="rounded px-1.5 py-0.5 text-xs bg-danger/20 text-danger hover:bg-danger/30"
+                          onClick={() => {
+                            deleteProject({ id: project._id });
+                            setConfirmDeleteId(null);
+                            addToast("Project deleted.", "info");
+                          }}
+                        >
+                          Delete
+                        </button>
+                        <button
+                          className="rounded px-1.5 py-0.5 text-xs bg-surface-lighter text-text-muted hover:text-white"
+                          onClick={() => setConfirmDeleteId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="rounded p-1 text-text-muted opacity-0 transition-opacity hover:bg-surface-lighter hover:text-danger group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDeleteId(project._id);
+                        }}
+                      >
+                        &#10005;
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-text-muted">
                     <span
@@ -258,6 +323,29 @@ function AuthenticatedHome() {
                 </div>
               ))}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="rounded-md bg-surface-lighter px-3 py-1.5 text-sm text-text-muted transition-colors hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  &larr; Prev
+                </button>
+                <span className="text-sm text-text-muted">
+                  Page {page + 1} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="rounded-md bg-surface-lighter px-3 py-1.5 text-sm text-text-muted transition-colors hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>
