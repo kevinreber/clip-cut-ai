@@ -106,6 +106,9 @@ function ProjectEditorContent() {
   const [silenceThreshold, setSilenceThreshold] = useState(2.0);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMatchIndices, setSearchMatchIndices] = useState<number[]>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.5);
+  const [targetSilenceDuration, setTargetSilenceDuration] = useState(0.5);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSavedTranscriptRef = useRef<string>("");
@@ -151,11 +154,97 @@ function ProjectEditorContent() {
     setSearchMatchIndices(matches);
   }, [searchQuery, transcript]);
 
+  // Reset current search index when matches change
+  useEffect(() => {
+    setCurrentSearchIndex(0);
+  }, [searchMatchIndices.length]);
+
   const selectSearchMatches = useCallback(() => {
     if (searchMatchIndices.length === 0) return;
     setSelection(new Set(searchMatchIndices));
     addToast(`${searchMatchIndices.length} matches selected`, "info");
   }, [searchMatchIndices, addToast]);
+
+  const deleteSearchMatches = useCallback(() => {
+    if (searchMatchIndices.length === 0) return;
+    const matchSet = new Set(searchMatchIndices);
+    setTranscript((prev) =>
+      prev.map((w, i) => (matchSet.has(i) ? { ...w, isDeleted: true } : w))
+    );
+    addToast(`${searchMatchIndices.length} matches deleted`, "success");
+  }, [searchMatchIndices, setTranscript, addToast]);
+
+  const restoreSearchMatches = useCallback(() => {
+    if (searchMatchIndices.length === 0) return;
+    const matchSet = new Set(searchMatchIndices);
+    setTranscript((prev) =>
+      prev.map((w, i) => (matchSet.has(i) ? { ...w, isDeleted: false } : w))
+    );
+    addToast(`${searchMatchIndices.length} matches restored`, "info");
+  }, [searchMatchIndices, setTranscript, addToast]);
+
+  const navigateSearchMatch = useCallback(
+    (direction: "next" | "prev") => {
+      if (searchMatchIndices.length === 0) return;
+      let newIndex = currentSearchIndex;
+      if (direction === "next") {
+        newIndex = (currentSearchIndex + 1) % searchMatchIndices.length;
+      } else {
+        newIndex = (currentSearchIndex - 1 + searchMatchIndices.length) % searchMatchIndices.length;
+      }
+      setCurrentSearchIndex(newIndex);
+      const wordIndex = searchMatchIndices[newIndex];
+      const word = transcript[wordIndex];
+      if (word) seekToTime(word.start);
+    },
+    [searchMatchIndices, currentSearchIndex, transcript, seekToTime]
+  );
+
+  const deleteLowConfidence = useCallback(() => {
+    let count = 0;
+    setTranscript((prev) =>
+      prev.map((w) => {
+        if (
+          w.confidence !== undefined &&
+          w.confidence < confidenceThreshold &&
+          !w.word.startsWith("[silence") &&
+          !w.isDeleted
+        ) {
+          count++;
+          return { ...w, isDeleted: true };
+        }
+        return w;
+      })
+    );
+    addToast(`${count} low-confidence words deleted`, "success");
+  }, [confidenceThreshold, setTranscript, addToast]);
+
+  const shortenAllSilences = useCallback(() => {
+    let count = 0;
+    setTranscript((prev) =>
+      prev.map((w) => {
+        if (w.word.startsWith("[silence") && !w.isDeleted) {
+          const originalDuration = w.end - w.start;
+          if (originalDuration > targetSilenceDuration) {
+            count++;
+            const newEnd = w.start + targetSilenceDuration;
+            return {
+              ...w,
+              end: newEnd,
+              word: `[silence ${targetSilenceDuration.toFixed(1)}s]`,
+            };
+          }
+        }
+        return w;
+      })
+    );
+    addToast(
+      count > 0
+        ? `${count} silence${count > 1 ? "s" : ""} shortened to ${targetSilenceDuration.toFixed(1)}s`
+        : "No silences to shorten",
+      count > 0 ? "success" : "info"
+    );
+  }, [targetSilenceDuration, setTranscript, addToast]);
 
   // Compute kept segments for preview mode
   const keptSegments = useMemo(
@@ -435,12 +524,24 @@ function ProjectEditorContent() {
             if (searchInput) searchInput.focus();
           }
           break;
+        case "F3":
+          e.preventDefault();
+          if (e.shiftKey) navigateSearchMatch("prev");
+          else navigateSearchMatch("next");
+          break;
+        case "f":
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const si = document.querySelector('[data-testid="transcript-search"]') as HTMLInputElement;
+            if (si) si.focus();
+          }
+          break;
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleUndo, handleRedo, togglePlayPause, seekRelative, seekToTime, playbackRate, volume, setPlaybackRate, setVolume, transcript, currentTime]);
+  }, [handleUndo, handleRedo, togglePlayPause, seekRelative, seekToTime, playbackRate, volume, setPlaybackRate, setVolume, transcript, currentTime, navigateSearchMatch]);
 
   // Unsaved changes warning
   const hasUnsavedChanges = canUndo;
@@ -763,6 +864,58 @@ function ProjectEditorContent() {
                       Restore All
                     </button>
                   </div>
+
+                  {/* Smart Silence Shortener */}
+                  {silenceCount > 0 && (
+                    <div className="flex w-full items-center gap-3 border-t border-surface-lighter pt-2" data-testid="silence-shortener">
+                      <span className="text-xs text-text-muted whitespace-nowrap">Shorten silences to:</span>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="2.0"
+                        step="0.1"
+                        value={targetSilenceDuration}
+                        onChange={(e) => setTargetSilenceDuration(parseFloat(e.target.value))}
+                        className="w-24 accent-primary"
+                      />
+                      <span className="text-xs font-medium text-white tabular-nums w-8">
+                        {targetSilenceDuration.toFixed(1)}s
+                      </span>
+                      <button
+                        onClick={shortenAllSilences}
+                        className="rounded-md bg-primary/20 px-3 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30"
+                        data-testid="shorten-silences-btn"
+                      >
+                        Shorten Silences
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Confidence-Based Auto-Delete */}
+                  {showConfidence && (
+                    <div className="flex w-full items-center gap-3 border-t border-surface-lighter pt-2" data-testid="confidence-threshold">
+                      <span className="text-xs text-text-muted whitespace-nowrap">Confidence threshold:</span>
+                      <input
+                        type="range"
+                        min="0.1"
+                        max="0.9"
+                        step="0.05"
+                        value={confidenceThreshold}
+                        onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+                        className="w-24 accent-primary"
+                      />
+                      <span className="text-xs font-medium text-white tabular-nums w-8">
+                        {(confidenceThreshold * 100).toFixed(0)}%
+                      </span>
+                      <button
+                        onClick={deleteLowConfidence}
+                        className="rounded-md bg-danger/20 px-3 py-1 text-xs font-medium text-danger transition-colors hover:bg-danger/30"
+                        data-testid="delete-low-confidence-btn"
+                      >
+                        Delete Below {(confidenceThreshold * 100).toFixed(0)}%
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="flex w-full items-center justify-between gap-3">
@@ -882,19 +1035,49 @@ function ProjectEditorContent() {
                     )}
                   </div>
                   {searchMatchIndices.length > 0 && (
-                    <>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => navigateSearchMatch("prev")}
+                        className="rounded bg-surface-lighter px-1.5 py-0.5 text-[10px] text-text-muted hover:text-white"
+                        title="Previous match (Shift+F3)"
+                      >
+                        &#9650;
+                      </button>
                       <span className="text-[10px] text-text-muted tabular-nums whitespace-nowrap">
-                        {searchMatchIndices.length} found
+                        {currentSearchIndex + 1}/{searchMatchIndices.length}
                       </span>
+                      <button
+                        onClick={() => navigateSearchMatch("next")}
+                        className="rounded bg-surface-lighter px-1.5 py-0.5 text-[10px] text-text-muted hover:text-white"
+                        title="Next match (F3)"
+                      >
+                        &#9660;
+                      </button>
                       <button
                         onClick={selectSearchMatches}
                         className="rounded-md bg-primary/20 px-2 py-1 text-[10px] font-medium text-primary transition-colors hover:bg-primary/30 whitespace-nowrap"
                         title="Select all matching words"
                         data-testid="search-select-all"
                       >
-                        Select All
+                        Select
                       </button>
-                    </>
+                      <button
+                        onClick={deleteSearchMatches}
+                        className="rounded-md bg-danger/20 px-2 py-1 text-[10px] font-medium text-danger transition-colors hover:bg-danger/30 whitespace-nowrap"
+                        title="Delete all matching words"
+                        data-testid="search-delete-all"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={restoreSearchMatches}
+                        className="rounded-md bg-success/20 px-2 py-1 text-[10px] font-medium text-success transition-colors hover:bg-success/30 whitespace-nowrap"
+                        title="Restore all matching words"
+                        data-testid="search-restore-all"
+                      >
+                        Restore
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -960,6 +1143,7 @@ function ProjectEditorContent() {
                         word.confidence !== undefined &&
                         word.confidence < 0.7;
                       const isSearchMatch = searchMatchIndices.includes(index);
+                      const isCurrentSearchMatch = searchMatchIndices.length > 0 && searchMatchIndices[currentSearchIndex] === index;
                       return (
                         <button
                           key={index}
@@ -976,7 +1160,7 @@ function ProjectEditorContent() {
                                   : word.isFiller
                                     ? "bg-filler/20 text-filler hover:bg-filler/30"
                                     : "text-text hover:bg-surface-lighter"
-                          } ${isActive && !isSelected ? "ring-2 ring-primary" : ""} ${isSearchMatch && !isSelected ? "ring-1 ring-warning bg-warning/10" : ""} ${lowConfidence ? "border-b-2 border-dashed border-danger/50" : ""}`}
+                          } ${isActive && !isSelected ? "ring-2 ring-primary" : ""} ${isCurrentSearchMatch && !isSelected ? "ring-2 ring-warning bg-warning/20" : isSearchMatch && !isSelected ? "ring-1 ring-warning bg-warning/10" : ""} ${lowConfidence ? "border-b-2 border-dashed border-danger/50" : ""}`}
                         >
                           {word.word}
                           {showConfidence && word.confidence !== undefined && (
@@ -1098,6 +1282,8 @@ function ProjectEditorContent() {
                 ["[ / ]", "Slow down / Speed up playback"],
                 ["M", "Mute / Unmute"],
                 ["/", "Focus search"],
+                ["Ctrl+F", "Focus search"],
+                ["F3 / Shift+F3", "Next / Previous search match"],
                 ["Ctrl+Z", "Undo"],
                 ["Ctrl+Shift+Z", "Redo"],
                 ["Shift+Click", "Select word range"],
