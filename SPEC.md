@@ -103,18 +103,18 @@ A running list of potential new features, organized by category. Items are unche
 - [ ] **AI smart cuts** — Go beyond fillers: detect and flag mumbled/low-confidence segments, false starts, and off-topic tangents using an LLM pass over the transcript.
 - [ ] **AI video summary** — Generate a short text summary or bullet-point outline of the video's content using an LLM.
 - [ ] **Custom filler word dictionary** — Let users add their own filler words/phrases (e.g., "basically", "right", "sort of") to the detection list per project or globally.
-- [ ] **Adjustable silence threshold** — Let users configure the minimum silence duration (currently hardcoded at 2s) via a slider (0.5s–5s).
+- [x] **Adjustable silence threshold** — Let users configure the minimum silence duration (currently hardcoded at 2s) via a slider (0.5s–5s).
 - [ ] **Confidence scores** — Show Whisper's per-word confidence and let users filter/flag low-confidence words for review.
 - [ ] **AI-powered chapter markers** — Auto-detect topic changes and generate chapter markers with titles, useful for YouTube uploads.
 
 ### Editing & Timeline
 - [ ] **Manual trim handles** — Drag-to-trim start/end points on individual segments in the timeline, beyond word-level granularity.
-- [ ] **Transcript search & replace** — Find specific words/phrases in the transcript and bulk-select or replace them.
+- [x] **Transcript search & replace** — Find specific words/phrases in the transcript and bulk-select or replace them.
 - [ ] **Split & merge segments** — Manually split a word segment or merge adjacent segments for fine-grained control.
 - [ ] **Clip extraction** — Select a range of the transcript and export just that portion as a standalone clip.
 - [ ] **Multi-track timeline** — Visual timeline with separate audio and video tracks for more advanced editing.
 - [ ] **Markers & annotations** — Let users drop custom markers on the timeline with notes (e.g., "re-record this section").
-- [ ] **Keyboard shortcuts expansion** — Add shortcuts for common actions: J/K/L for rewind/pause/forward, arrow keys for word-by-word navigation, number keys for playback speed.
+- [x] **Keyboard shortcuts expansion** — Add shortcuts for common actions: J/K/L for rewind/pause/forward, arrow keys for word-by-word navigation, number keys for playback speed.
 
 ### Export & Output
 - [ ] **Audio-only export** — Export just the cleaned audio as MP3/WAV, perfect for podcast workflows.
@@ -132,7 +132,7 @@ A running list of potential new features, organized by category. Items are unche
 - [ ] **Team workspaces** — Organization-level accounts with shared project libraries and member roles.
 
 ### UX & Quality of Life
-- [ ] **Auto-save** — Add periodic background saves (every 30s) with a visual save indicator. *(Partial: transcript already syncs reactively on change, but lacks a timer-based safety net and save status UI.)*
+- [x] **Auto-save** — Add periodic background saves (every 30s) with a visual save indicator.
 - [ ] **Version history** — Browse and restore previous edit states of a project, beyond the in-session undo/redo stack.
 - [ ] **Project folders/tags** — Organize projects into folders or apply tags for better library management.
 - [ ] **Batch processing** — Upload multiple videos and apply a "clean all fillers + silences" preset to all of them in one go.
@@ -146,7 +146,7 @@ A running list of potential new features, organized by category. Items are unche
 - [ ] **Audio normalization** — Auto-level audio volume across the video to fix quiet/loud segments.
 - [ ] **Noise reduction** — AI-powered background noise removal (fan hum, keyboard clicks, echo).
 - [ ] **Audio ducking** — Automatically lower background music volume when speech is detected.
-- [ ] **Fade transitions** — Add configurable crossfade (audio) and fade-to-black (video) between cuts instead of hard jumps.
+- [x] **Fade transitions** — Add configurable crossfade (audio) and fade-to-black (video) between cuts instead of hard jumps.
 - [ ] **Playback speed ramp** — Speed up silence/filler sections instead of cutting them entirely (e.g., 3x speed through pauses).
 
 ### Integrations & Platform

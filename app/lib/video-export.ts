@@ -59,6 +59,11 @@ export function computeKeptSegments(
 
 export type ExportQuality = "original" | "fast" | "balanced" | "high";
 
+export type FadeOptions = {
+  enabled: boolean;
+  duration: number; // in seconds, e.g., 0.3
+};
+
 const QUALITY_PRESETS: Record<
   Exclude<ExportQuality, "original">,
   { preset: string; crf: string; audioBitrate: string }
@@ -73,7 +78,8 @@ export async function exportVideo(
   transcript: TranscriptWord[],
   videoDuration: number,
   onProgress: (progress: ExportProgress) => void,
-  quality: ExportQuality = "fast"
+  quality: ExportQuality = "fast",
+  fade?: FadeOptions
 ): Promise<Blob> {
   const segments = computeKeptSegments(transcript, videoDuration);
 
@@ -113,8 +119,12 @@ export async function exportVideo(
   // at edit boundaries, but the video/audio quality is perfectly preserved.
   const useStreamCopy = quality === "original";
 
-  function buildSegmentArgs(seg: Segment, outputName: string): string[] {
-    if (useStreamCopy) {
+  const useFade = fade?.enabled && fade.duration > 0;
+  const fadeDur = fade?.duration ?? 0.3;
+
+  function buildSegmentArgs(seg: Segment, outputName: string, isFirst: boolean, isLast: boolean): string[] {
+    const segDuration = seg.end - seg.start;
+    if (useStreamCopy && !useFade) {
       return [
         "-i",
         "input.mp4",
@@ -129,8 +139,8 @@ export async function exportVideo(
         outputName,
       ];
     }
-    const { preset, crf, audioBitrate } = QUALITY_PRESETS[quality];
-    return [
+    const q = useStreamCopy ? QUALITY_PRESETS["fast"] : QUALITY_PRESETS[quality as Exclude<ExportQuality, "original">];
+    const args = [
       "-i",
       "input.mp4",
       "-ss",
@@ -140,28 +150,52 @@ export async function exportVideo(
       "-c:v",
       "libx264",
       "-preset",
-      preset,
+      q.preset,
       "-crf",
-      crf,
+      q.crf,
       "-pix_fmt",
       "yuv420p",
-      "-c:a",
-      "aac",
-      "-b:a",
-      audioBitrate,
+    ];
+
+    // Build audio and video filters for fade
+    if (useFade && segDuration > fadeDur * 2) {
+      const audioFilters: string[] = [];
+      const videoFilters: string[] = [];
+      if (!isFirst) {
+        audioFilters.push(`afade=t=in:st=0:d=${fadeDur}`);
+        videoFilters.push(`fade=t=in:st=0:d=${fadeDur}`);
+      }
+      if (!isLast) {
+        const fadeOutStart = segDuration - fadeDur;
+        audioFilters.push(`afade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDur}`);
+        videoFilters.push(`fade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeDur}`);
+      }
+      if (videoFilters.length > 0) {
+        args.push("-vf", videoFilters.join(","));
+      }
+      if (audioFilters.length > 0) {
+        args.push("-af", audioFilters.join(","));
+      }
+      args.push("-c:a", "aac", "-b:a", q.audioBitrate);
+    } else {
+      args.push("-c:a", "aac", "-b:a", q.audioBitrate);
+    }
+
+    args.push(
       "-movflags",
       "+faststart",
       "-avoid_negative_ts",
       "make_zero",
-      outputName,
-    ];
+      outputName
+    );
+    return args;
   }
 
   // Build a concat filter for the segments
   if (segments.length === 1) {
     // Simple trim
     const seg = segments[0];
-    await ffmpeg.exec(buildSegmentArgs(seg, "output.mp4"));
+    await ffmpeg.exec(buildSegmentArgs(seg, "output.mp4", true, true));
   } else {
     // Use concat demuxer: trim each segment then concatenate
     // Write individual segment files
@@ -172,7 +206,7 @@ export async function exportVideo(
         percent: 5 + Math.round((i / segments.length) * 70),
         message: `Trimming segment ${i + 1} of ${segments.length}...`,
       });
-      await ffmpeg.exec(buildSegmentArgs(seg, `seg_${i}.mp4`));
+      await ffmpeg.exec(buildSegmentArgs(seg, `seg_${i}.mp4`, i === 0, i === segments.length - 1));
     }
 
     onProgress({

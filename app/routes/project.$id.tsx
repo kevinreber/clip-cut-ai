@@ -65,6 +65,7 @@ function ProjectEditorContent() {
   const duplicateProject = useMutation(api.projects.duplicateProject);
   const updateLanguage = useMutation(api.projects.updateLanguage);
   const updateCustomFillerWords = useMutation(api.projects.updateCustomFillerWords);
+  const updateSilenceThreshold = useMutation(api.projects.updateSilenceThreshold);
 
   const effectiveVideoUrl = useVideoCache(project?.videoFileId, videoUrl);
   const {
@@ -102,6 +103,12 @@ function ProjectEditorContent() {
   const [language, setLanguage] = useState("");
   const [customFillerWords, setCustomFillerWords] = useState<string[]>([]);
   const [showBeforeAfter, setShowBeforeAfter] = useState(false);
+  const [silenceThreshold, setSilenceThreshold] = useState(2.0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchMatchIndices, setSearchMatchIndices] = useState<number[]>([]);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved">("saved");
+  const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastSavedTranscriptRef = useRef<string>("");
   const lastClickedIndex = useRef<number | null>(null);
   const { addToast } = useToast();
 
@@ -116,6 +123,7 @@ function ProjectEditorContent() {
       );
       setLanguage(project.language || "");
       setCustomFillerWords(project.customFillerWords || []);
+      setSilenceThreshold(project.silenceThreshold ?? 2.0);
       setInitialized(true);
     }
   }, [project, initialized]);
@@ -126,6 +134,28 @@ function ProjectEditorContent() {
       resetTranscript(project.transcript);
     }
   }, [project?.transcript]);
+
+  // Compute search matches
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchMatchIndices([]);
+      return;
+    }
+    const query = searchQuery.toLowerCase().trim();
+    const matches: number[] = [];
+    for (let i = 0; i < transcript.length; i++) {
+      if (transcript[i].word.toLowerCase().includes(query)) {
+        matches.push(i);
+      }
+    }
+    setSearchMatchIndices(matches);
+  }, [searchQuery, transcript]);
+
+  const selectSearchMatches = useCallback(() => {
+    if (searchMatchIndices.length === 0) return;
+    setSelection(new Set(searchMatchIndices));
+    addToast(`${searchMatchIndices.length} matches selected`, "info");
+  }, [searchMatchIndices, addToast]);
 
   // Compute kept segments for preview mode
   const keptSegments = useMemo(
@@ -163,6 +193,7 @@ function ProjectEditorContent() {
         projectId: id as Id<"projects">,
         language: language || undefined,
         customFillerWords: customFillerWords.length > 0 ? customFillerWords : undefined,
+        silenceThreshold: silenceThreshold !== 2.0 ? silenceThreshold : undefined,
       });
     } catch (err: any) {
       const message =
@@ -173,7 +204,7 @@ function ProjectEditorContent() {
     } finally {
       setAnalyzing(false);
     }
-  }, [id, analyzeVideo, language, customFillerWords]);
+  }, [id, analyzeVideo, language, customFillerWords, silenceThreshold]);
 
   const toggleWordDeleted = useCallback(
     (index: number) => {
@@ -282,19 +313,43 @@ function ProjectEditorContent() {
     redoTranscript();
   }, [redoTranscript]);
 
-  // Persist after undo/redo
+  // Persist after undo/redo with save status
   const prevTranscriptRef = useRef(transcript);
   useEffect(() => {
     if (prevTranscriptRef.current !== transcript && initialized && transcript.length > 0) {
+      setSaveStatus("saving");
       syncTranscript(transcript);
+      const hash = JSON.stringify(transcript.map((w) => w.isDeleted));
+      lastSavedTranscriptRef.current = hash;
+      // Brief delay to show "saving" state
+      const timer = setTimeout(() => setSaveStatus("saved"), 500);
+      return () => clearTimeout(timer);
     }
     prevTranscriptRef.current = transcript;
   }, [transcript, initialized, syncTranscript]);
 
+  // Auto-save timer: sync every 30 seconds as safety net
+  useEffect(() => {
+    if (!initialized || transcript.length === 0) return;
+    autoSaveTimerRef.current = setInterval(() => {
+      const hash = JSON.stringify(transcript.map((w) => w.isDeleted));
+      if (hash !== lastSavedTranscriptRef.current) {
+        setSaveStatus("saving");
+        syncTranscript(transcript);
+        lastSavedTranscriptRef.current = hash;
+        setTimeout(() => setSaveStatus("saved"), 500);
+      }
+    }, 30000);
+    return () => {
+      if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current);
+    };
+  }, [initialized, transcript, syncTranscript]);
+
   // Keyboard shortcuts
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if ((e.target as HTMLElement).tagName === "INPUT") return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
 
       if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault();
@@ -326,6 +381,39 @@ function ProjectEditorContent() {
         case "ArrowRight":
           seekRelative(5);
           break;
+        case "j":
+          if (!e.metaKey && !e.ctrlKey) {
+            seekRelative(-10);
+          }
+          break;
+        case "k":
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            togglePlayPause();
+          }
+          break;
+        case "l":
+          if (!e.metaKey && !e.ctrlKey) {
+            seekRelative(10);
+          }
+          break;
+        case ",":
+          // Previous word
+          if (transcript.length > 0) {
+            const prevWord = transcript.filter((w) => w.end <= currentTime).pop();
+            if (prevWord) seekToTime(prevWord.start);
+          }
+          break;
+        case ".":
+          // Next word
+          if (transcript.length > 0) {
+            const nextWord = transcript.find((w) => w.start > currentTime);
+            if (nextWord) seekToTime(nextWord.start);
+          }
+          break;
+        case "0":
+          if (!e.metaKey && !e.ctrlKey) seekToTime(0);
+          break;
         case "?":
           setShowShortcuts((s) => !s);
           break;
@@ -340,12 +428,19 @@ function ProjectEditorContent() {
             setVolume(volume === 0 ? 1 : 0);
           }
           break;
+        case "/":
+          if (!e.metaKey && !e.ctrlKey) {
+            e.preventDefault();
+            const searchInput = document.querySelector('[data-testid="transcript-search"]') as HTMLInputElement;
+            if (searchInput) searchInput.focus();
+          }
+          break;
       }
     }
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleUndo, handleRedo, togglePlayPause, seekRelative, playbackRate, volume, setPlaybackRate, setVolume]);
+  }, [handleUndo, handleRedo, togglePlayPause, seekRelative, seekToTime, playbackRate, volume, setPlaybackRate, setVolume, transcript, currentTime]);
 
   // Unsaved changes warning
   const hasUnsavedChanges = canUndo;
@@ -375,6 +470,16 @@ function ProjectEditorContent() {
       }
     },
     [project, updateLanguage]
+  );
+
+  const handleSilenceThresholdChange = useCallback(
+    (value: number) => {
+      setSilenceThreshold(value);
+      if (project) {
+        updateSilenceThreshold({ projectId: project._id, silenceThreshold: value });
+      }
+    },
+    [project, updateSilenceThreshold]
   );
 
   const handleCustomFillerWordsUpdate = useCallback(
@@ -463,6 +568,21 @@ function ProjectEditorContent() {
           >
             {project.status}
           </span>
+          {hasTranscript && (
+            <span
+              className={`shrink-0 text-[10px] transition-opacity ${
+                saveStatus === "saving"
+                  ? "text-warning animate-pulse"
+                  : saveStatus === "unsaved"
+                    ? "text-warning"
+                    : "text-text-muted/40"
+              }`}
+              data-testid="save-status"
+              title={saveStatus === "saving" ? "Saving..." : saveStatus === "unsaved" ? "Unsaved changes" : "All changes saved"}
+            >
+              {saveStatus === "saving" ? "Saving..." : saveStatus === "unsaved" ? "Unsaved" : "Saved"}
+            </span>
+          )}
           <button
             onClick={handleDuplicate}
             className="shrink-0 rounded-md bg-surface-lighter px-2 py-1 text-xs text-text-muted transition-colors hover:text-white"
@@ -741,15 +861,76 @@ function ProjectEditorContent() {
                   ? "Click to seek. Double-click to delete/restore. Shift+click to select a range."
                   : "Analyze your video to generate a transcript."}
               </p>
+              {hasTranscript && (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      placeholder="Search transcript..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full rounded-md border border-surface-lighter bg-surface px-3 py-1.5 pr-8 text-xs text-white placeholder-text-muted/50 outline-none focus:border-primary"
+                      data-testid="transcript-search"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-white text-xs"
+                      >
+                        &#10005;
+                      </button>
+                    )}
+                  </div>
+                  {searchMatchIndices.length > 0 && (
+                    <>
+                      <span className="text-[10px] text-text-muted tabular-nums whitespace-nowrap">
+                        {searchMatchIndices.length} found
+                      </span>
+                      <button
+                        onClick={selectSearchMatches}
+                        className="rounded-md bg-primary/20 px-2 py-1 text-[10px] font-medium text-primary transition-colors hover:bg-primary/30 whitespace-nowrap"
+                        title="Select all matching words"
+                        data-testid="search-select-all"
+                      >
+                        Select All
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Custom Filler Words */}
+            {/* Custom Filler Words & Silence Threshold */}
             {!hasTranscript && effectiveVideoUrl && !isAnalyzing && (
-              <div className="border-b border-surface-lighter px-4 py-3">
+              <div className="border-b border-surface-lighter px-4 py-3 space-y-3">
                 <CustomFillerWords
                   customWords={customFillerWords}
                   onUpdate={handleCustomFillerWordsUpdate}
                 />
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-text-muted">
+                      Silence threshold
+                    </label>
+                    <span className="text-xs font-medium text-white tabular-nums">
+                      {silenceThreshold.toFixed(1)}s
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="5"
+                    step="0.5"
+                    value={silenceThreshold}
+                    onChange={(e) => handleSilenceThresholdChange(parseFloat(e.target.value))}
+                    className="mt-1 w-full accent-primary"
+                    data-testid="silence-threshold-slider"
+                  />
+                  <div className="mt-0.5 flex justify-between text-[10px] text-text-muted/50">
+                    <span>0.5s</span>
+                    <span>5s</span>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -778,6 +959,7 @@ function ProjectEditorContent() {
                         showConfidence &&
                         word.confidence !== undefined &&
                         word.confidence < 0.7;
+                      const isSearchMatch = searchMatchIndices.includes(index);
                       return (
                         <button
                           key={index}
@@ -794,7 +976,7 @@ function ProjectEditorContent() {
                                   : word.isFiller
                                     ? "bg-filler/20 text-filler hover:bg-filler/30"
                                     : "text-text hover:bg-surface-lighter"
-                          } ${isActive && !isSelected ? "ring-2 ring-primary" : ""} ${lowConfidence ? "border-b-2 border-dashed border-danger/50" : ""}`}
+                          } ${isActive && !isSelected ? "ring-2 ring-primary" : ""} ${isSearchMatch && !isSelected ? "ring-1 ring-warning bg-warning/10" : ""} ${lowConfidence ? "border-b-2 border-dashed border-danger/50" : ""}`}
                         >
                           {word.word}
                           {showConfidence && word.confidence !== undefined && (
@@ -907,11 +1089,15 @@ function ProjectEditorContent() {
             </div>
             <div className="space-y-2 text-sm">
               {[
-                ["Space", "Play / Pause"],
+                ["Space / K", "Play / Pause"],
                 ["P", "Toggle preview mode"],
                 ["\u2190 / \u2192", "Seek back / forward 5s"],
+                ["J / L", "Seek back / forward 10s"],
+                [", / .", "Previous / Next word"],
+                ["0", "Jump to start"],
                 ["[ / ]", "Slow down / Speed up playback"],
                 ["M", "Mute / Unmute"],
+                ["/", "Focus search"],
                 ["Ctrl+Z", "Undo"],
                 ["Ctrl+Shift+Z", "Redo"],
                 ["Shift+Click", "Select word range"],

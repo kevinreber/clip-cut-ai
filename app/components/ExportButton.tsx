@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { exportVideo, exportAudio, type ExportProgress, type ExportQuality } from "../lib/video-export";
+import { exportVideo, exportAudio, type ExportProgress, type ExportQuality, type FadeOptions } from "../lib/video-export";
 import {
   generateSrt,
   generateVtt,
@@ -40,6 +40,7 @@ export function ExportButton({
   const [error, setError] = useState<string | null>(null);
   const [quality, setQuality] = useState<ExportQuality>("original");
   const [exportFormat, setExportFormat] = useState<"video" | "audio">("video");
+  const [fadeEnabled, setFadeEnabled] = useState(false);
   const startTimeRef = useRef<number>(0);
   const [eta, setEta] = useState<string>("");
 
@@ -69,6 +70,7 @@ export function ExportButton({
     try {
       let blob: Blob;
       let filename: string;
+      const fadeOpts: FadeOptions = { enabled: fadeEnabled, duration: 0.3 };
       if (exportFormat === "audio") {
         blob = await exportAudio(
           videoUrl,
@@ -84,7 +86,8 @@ export function ExportButton({
           transcript,
           videoDuration,
           handleProgressWithEta,
-          quality
+          quality,
+          fadeOpts
         );
         filename = `${projectName.replace(/\.[^.]+$/, "")}_edited.mp4`;
       }
@@ -105,7 +108,7 @@ export function ExportButton({
         message: err.message || "Export failed.",
       });
     }
-  }, [videoUrl, transcript, videoDuration, projectName, quality, exportFormat, handleProgressWithEta]);
+  }, [videoUrl, transcript, videoDuration, projectName, quality, exportFormat, fadeEnabled, handleProgressWithEta]);
 
   const hasDeletedWords = transcript.some((w) => w.isDeleted);
 
@@ -193,6 +196,22 @@ export function ExportButton({
               </button>
             ))}
           </div>
+          {exportFormat === "video" && (
+            <div className="flex items-center gap-2">
+              <label className="flex cursor-pointer items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={fadeEnabled}
+                  onChange={(e) => setFadeEnabled(e.target.checked)}
+                  className="accent-primary"
+                  data-testid="fade-toggle"
+                />
+                <span className="text-xs text-text-muted" title="Add smooth fade-in/out transitions between cuts (0.3s)">
+                  Fade transitions
+                </span>
+              </label>
+            </div>
+          )}
         </div>
       )}
 
