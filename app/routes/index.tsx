@@ -243,7 +243,7 @@ function AuthenticatedHome() {
           />
         </div>
 
-        <div className="mb-8 flex justify-center sm:mb-12">
+        <div className="mb-8 flex flex-col items-center gap-4 sm:mb-12">
           <label
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -289,6 +289,18 @@ function AuthenticatedHome() {
               </>
             )}
           </label>
+
+          <div className="flex items-center gap-2 text-sm text-text-muted">
+            <span>or</span>
+            <button
+              data-testid="record-screen-btn"
+              onClick={() => navigate({ to: "/record" })}
+              className="flex items-center gap-2 rounded-lg border border-danger/50 bg-danger/10 px-4 py-2 font-medium text-danger transition-colors hover:bg-danger/20"
+            >
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-danger" />
+              Record Screen
+            </button>
+          </div>
         </div>
 
         {projects && projects.length > 0 && (

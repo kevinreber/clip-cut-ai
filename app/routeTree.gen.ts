@@ -10,7 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TryRouteImport } from './routes/try'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as RecordRouteImport } from './routes/record'
 import { Route as DemoRouteImport } from './routes/demo'
+import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectIdRouteImport } from './routes/project.$id'
 
@@ -19,9 +22,24 @@ const TryRoute = TryRouteImport.update({
   path: '/try',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecordRoute = RecordRouteImport.update({
+  id: '/record',
+  path: '/record',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DemoRoute = DemoRouteImport.update({
   id: '/demo',
   path: '/demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChangelogRoute = ChangelogRouteImport.update({
+  id: '/changelog',
+  path: '/changelog',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -37,34 +55,68 @@ const ProjectIdRoute = ProjectIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/changelog': typeof ChangelogRoute
   '/demo': typeof DemoRoute
+  '/record': typeof RecordRoute
+  '/settings': typeof SettingsRoute
   '/try': typeof TryRoute
   '/project/$id': typeof ProjectIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/changelog': typeof ChangelogRoute
   '/demo': typeof DemoRoute
+  '/record': typeof RecordRoute
+  '/settings': typeof SettingsRoute
   '/try': typeof TryRoute
   '/project/$id': typeof ProjectIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/changelog': typeof ChangelogRoute
   '/demo': typeof DemoRoute
+  '/record': typeof RecordRoute
+  '/settings': typeof SettingsRoute
   '/try': typeof TryRoute
   '/project/$id': typeof ProjectIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/demo' | '/try' | '/project/$id'
+  fullPaths:
+    | '/'
+    | '/changelog'
+    | '/demo'
+    | '/record'
+    | '/settings'
+    | '/try'
+    | '/project/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/demo' | '/try' | '/project/$id'
-  id: '__root__' | '/' | '/demo' | '/try' | '/project/$id'
+  to:
+    | '/'
+    | '/changelog'
+    | '/demo'
+    | '/record'
+    | '/settings'
+    | '/try'
+    | '/project/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/changelog'
+    | '/demo'
+    | '/record'
+    | '/settings'
+    | '/try'
+    | '/project/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ChangelogRoute: typeof ChangelogRoute
   DemoRoute: typeof DemoRoute
+  RecordRoute: typeof RecordRoute
+  SettingsRoute: typeof SettingsRoute
   TryRoute: typeof TryRoute
   ProjectIdRoute: typeof ProjectIdRoute
 }
@@ -78,11 +130,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/record': {
+      id: '/record'
+      path: '/record'
+      fullPath: '/record'
+      preLoaderRoute: typeof RecordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/demo': {
       id: '/demo'
       path: '/demo'
       fullPath: '/demo'
       preLoaderRoute: typeof DemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/changelog': {
+      id: '/changelog'
+      path: '/changelog'
+      fullPath: '/changelog'
+      preLoaderRoute: typeof ChangelogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -104,7 +177,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ChangelogRoute: ChangelogRoute,
   DemoRoute: DemoRoute,
+  RecordRoute: RecordRoute,
+  SettingsRoute: SettingsRoute,
   TryRoute: TryRoute,
   ProjectIdRoute: ProjectIdRoute,
 }
