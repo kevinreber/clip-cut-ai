@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Collaborative Editing — share projects with team members as editors or viewers; real-time presence indicators show who's online with colored avatars; threaded comments anchored to specific transcript words with resolve/delete support; project owner can invite collaborators by email and manage roles from the Share dialog
+- E2E test suite for collaborative editing features (share dialog, comments panel, presence indicators)
 - Built-In Screen Recording — record your screen, camera, or both directly in ClipCut AI using the browser's MediaRecorder API; pause/resume support, live preview, and one-click project creation from recordings (`/record` page)
 - E2E test suite for built-in screen recording feature
 - Intro/Outro Templates — attach branded intro/outro cards to your exports with 4 styles (Fade Text, Logo Card, Lower Third, Full Screen), customizable text, colors, duration, and live canvas preview

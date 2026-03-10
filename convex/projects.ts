@@ -21,8 +21,18 @@ export const get = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const project = await ctx.db.get(args.id);
-    if (!project || project.userId !== userId) return null;
-    return project;
+    if (!project) return null;
+    // Allow owner access
+    if (project.userId === userId) return project;
+    // Allow collaborator access
+    const collab = await ctx.db
+      .query("projectCollaborators")
+      .withIndex("by_project_user", (q) =>
+        q.eq("projectId", args.id).eq("userId", userId)
+      )
+      .first();
+    if (collab) return project;
+    return null;
   },
 });
 
