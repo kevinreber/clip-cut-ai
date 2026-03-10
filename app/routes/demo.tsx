@@ -15,6 +15,8 @@ import { ClipExtractor } from "../components/ClipExtractor";
 import { AnimatedCaptions } from "../components/AnimatedCaptions";
 import { AIRewriteSuggestions } from "../components/AIRewriteSuggestions";
 import { AudioEnhancement } from "../components/AudioEnhancement";
+import { IntroOutroTemplates } from "../components/IntroOutroTemplates";
+import { PresetsLibrary } from "../components/PresetsLibrary";
 import {
   generateSrt,
   generateVtt,
@@ -172,6 +174,8 @@ function DemoPage() {
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
   const [targetSilenceDuration, setTargetSilenceDuration] = useState(0.5);
   const [editorMode, setEditorMode] = useState<"word" | "text">("word");
+  const [introTemplate, setIntroTemplate] = useState<any>(null);
+  const [outroTemplate, setOutroTemplate] = useState<any>(null);
   const lastClickedIndex = useRef<number | null>(null);
 
   const keptSegments = useMemo(
@@ -762,6 +766,32 @@ function DemoPage() {
               projectName="demo"
               currentCaptionStyle={undefined}
               onStyleChange={() => {}}
+            />
+
+            {/* Intro/Outro Templates (demo) */}
+            <IntroOutroTemplates
+              introTemplate={introTemplate}
+              outroTemplate={outroTemplate}
+              onIntroChange={setIntroTemplate}
+              onOutroChange={setOutroTemplate}
+            />
+
+            {/* Templates & Presets Library (demo — read-only) */}
+            <PresetsLibrary
+              presets={undefined}
+              communityPresets={undefined}
+              onSave={async () => {
+                addToast("Saving presets requires an account.", "info");
+              }}
+              onDelete={async () => {}}
+              onApply={() => {
+                addToast("Preset applied! (Demo mode — settings are not persisted)", "info");
+              }}
+              currentSettings={{
+                silenceThreshold: 2.0,
+                customFillerWords: [],
+                confidenceThreshold: 0.5,
+              }}
             />
 
             {/* Subtitle Export (demo mode - no video export) */}

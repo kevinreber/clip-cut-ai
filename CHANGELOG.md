@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Intro/Outro Templates — attach branded intro/outro cards to your exports with 4 styles (Fade Text, Logo Card, Lower Third, Full Screen), customizable text, colors, duration, and live canvas preview
+- Webhook / Zapier Integration — configure webhook URLs in Settings to receive HTTP POST notifications when exports complete, projects are analyzed, or new projects are created; includes test webhook, enable/disable toggle, and integration documentation for Zapier, Make, and n8n
+- Templates & Presets Library — save, share, and apply cleanup presets with built-in options (Podcast Clean, Lecture Tighten, Interview Polish, YouTube Fast-Cut), user-created presets, and a community gallery; presets configure silence threshold, filler word lists, and confidence thresholds in one click
+- E2E test suite for P2 new features (intro/outro templates, presets library, webhook settings)
 - Audio Enhancement / Noise Reduction — client-side audio processing using Web Audio API with 3 presets (Clean Podcast, Reduce Background Noise, Normalize Volume) and advanced controls for noise gate, 3-band EQ, compression, and volume normalization
 - AI Rewrite Suggestions — AI analyzes your transcript to find filler-heavy or unclear sections and suggests cleaner rephrasings that you can accept inline, marking original words as deleted
 - Batch Processing — upload multiple videos at once from the dashboard with queue-based processing, progress tracking per video, and automatic transcription analysis
