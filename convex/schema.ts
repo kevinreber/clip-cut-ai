@@ -208,4 +208,57 @@ export default defineSchema({
     resolvedBy: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_projectId", ["projectId"]),
+  compilations: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    sourceProjectIds: v.array(v.id("projects")),
+    assemblyMode: v.union(
+      v.literal("best-story"),
+      v.literal("highlight-reel"),
+      v.literal("chronological"),
+      v.literal("custom")
+    ),
+    aiSuggestion: v.optional(
+      v.object({
+        narrativeSummary: v.string(),
+        segments: v.array(
+          v.object({
+            projectId: v.id("projects"),
+            projectName: v.string(),
+            start: v.number(),
+            end: v.number(),
+            order: v.number(),
+            reason: v.string(),
+          })
+        ),
+      })
+    ),
+    finalSequence: v.optional(
+      v.array(
+        v.object({
+          projectId: v.id("projects"),
+          projectName: v.string(),
+          start: v.number(),
+          end: v.number(),
+          order: v.number(),
+          included: v.boolean(),
+        })
+      )
+    ),
+    transition: v.optional(
+      v.union(
+        v.literal("cut"),
+        v.literal("crossfade"),
+        v.literal("fade-to-black")
+      )
+    ),
+    status: v.union(
+      v.literal("selecting"),
+      v.literal("analyzing"),
+      v.literal("reviewed"),
+      v.literal("exporting"),
+      v.literal("done")
+    ),
+    createdAt: v.number(),
+  }).index("by_userId", ["userId"]),
 });
