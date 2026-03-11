@@ -300,6 +300,14 @@ function AuthenticatedHome() {
               <span className="inline-block h-2.5 w-2.5 rounded-full bg-danger" />
               Record Screen
             </button>
+            <span>or</span>
+            <button
+              data-testid="combine-videos-btn"
+              onClick={() => navigate({ to: "/compilations" })}
+              className="flex items-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-4 py-2 font-medium text-primary transition-colors hover:bg-primary/20"
+            >
+              Combine Videos
+            </button>
           </div>
         </div>
 
