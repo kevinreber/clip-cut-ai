@@ -192,7 +192,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
 
 export function AnimatedCaptions({
   transcript,
-  videoDuration,
+  videoDuration: _videoDuration,
   projectName,
   currentCaptionStyle,
   onStyleChange,

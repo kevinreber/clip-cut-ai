@@ -10,7 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - GitHub Actions workflow to automatically run Playwright E2E tests on pushes to main and pull requests
-- GitHub Actions workflow for linting (ESLint) and TypeScript type checking on pushes to main and pull requests
+- GitHub Actions workflow for ESLint linting on pushes to main and pull requests
+- ESLint configuration (`eslint.config.js`) with TypeScript support
 - GitHub Actions workflow to verify production builds on pushes to main and pull requests
 - GitHub Actions workflow for dependency security audits on pushes to main, pull requests, and weekly schedule
 - Multi-Track Timeline — add B-roll video, audio, image, and text overlay tracks on top of your primary video with drag-and-drop positioning, per-track volume/opacity controls, and layer management

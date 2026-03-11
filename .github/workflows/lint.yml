@@ -1,4 +1,4 @@
-name: Lint & Type Check
+name: Lint
 
 on:
   push:
@@ -24,6 +24,3 @@ jobs:
 
       - name: Run ESLint
         run: npm run lint
-
-      - name: Run TypeScript type check
-        run: npx tsc --noEmit

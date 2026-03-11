@@ -236,12 +236,9 @@ function ProjectEditorContent() {
   const navigateSearchMatch = useCallback(
     (direction: "next" | "prev") => {
       if (searchMatchIndices.length === 0) return;
-      let newIndex = currentSearchIndex;
-      if (direction === "next") {
-        newIndex = (currentSearchIndex + 1) % searchMatchIndices.length;
-      } else {
-        newIndex = (currentSearchIndex - 1 + searchMatchIndices.length) % searchMatchIndices.length;
-      }
+      const newIndex = direction === "next"
+        ? (currentSearchIndex + 1) % searchMatchIndices.length
+        : (currentSearchIndex - 1 + searchMatchIndices.length) % searchMatchIndices.length;
       setCurrentSearchIndex(newIndex);
       const wordIndex = searchMatchIndices[newIndex];
       const word = transcript[wordIndex];

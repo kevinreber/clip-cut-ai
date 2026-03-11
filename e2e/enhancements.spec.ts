@@ -236,7 +236,7 @@ test.describe("Export Enhancements", () => {
     await removeFillers.click();
 
     // Check export section
-    const exportSection = page.locator('[data-testid="export-section"]');
+    const _exportSection = page.locator('[data-testid="export-section"]');
     // Export section is only on /try and /project pages, not demo
     // Demo page has subtitle export buttons instead
     const srtBtn = page.getByRole("button", { name: "Export SRT" });
