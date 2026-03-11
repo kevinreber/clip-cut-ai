@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Expanded CLAUDE.md with comprehensive codebase documentation covering project structure, database schema, environment variables, code conventions, deployment pipeline, pre-push hooks, and architecture decisions
+
 ### Added
 - AI Story Assembly / Auto-Combine Clips — select multiple analyzed projects from the `/compilations` page, choose an assembly mode (Best Story, Highlight Reel, Chronological, Custom), and let AI analyze all transcripts to suggest an optimal narrative order with segment-level reasoning; drag-to-reorder segments, toggle include/exclude per segment, choose transition type (Hard Cut, Crossfade, Fade to Black), and view a color-coded visual timeline of the assembled compilation; "Combine Videos" button added to dashboard
 - E2E test suite for AI Story Assembly feature (route validation, component rendering, error-free loading)
