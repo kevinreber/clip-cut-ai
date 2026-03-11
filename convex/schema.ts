@@ -10,6 +10,14 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_userId", ["userId"]),
+  apiUsage: defineTable({
+    userId: v.string(),
+    action: v.string(), // "whisper", "ai_feature", "tts", "compilation"
+    creditsUsed: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_createdAt", ["userId", "createdAt"]),
   projects: defineTable({
     name: v.string(),
     userId: v.string(),

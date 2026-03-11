@@ -7,6 +7,7 @@ import { UserMenu } from "../components/UserMenu";
 import { useToast } from "../components/Toast";
 import { AuthForm } from "../components/AuthForm";
 import { WebhookSettings } from "../components/WebhookSettings";
+import { CreditsBadge } from "../components/CreditsBadge";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -139,6 +140,9 @@ function SettingsContent() {
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 space-y-8">
+        {/* Credits Budget */}
+        <CreditsBadge />
+
         {/* API Key Section */}
         <section className="rounded-lg border border-surface-lighter bg-surface-light p-6">
           <h2 className="mb-1 text-lg font-semibold text-white">

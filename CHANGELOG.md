@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Free platform credits system — new users get 15 free credits to try AI features (transcription, summaries, chapters, clips, TTS, etc.) using the shared platform key; once credits are exhausted, users are prompted to add their own OpenAI API key in Settings for unlimited access
+- Credits budget indicator shown in Settings and the project editor with progress bar, remaining count, and contextual nudges when credits are running low or exhausted
+- BYOK (Bring Your Own Key) users bypass all credit limits entirely
+
 ### Changed
 - Expanded CLAUDE.md with comprehensive codebase documentation covering project structure, database schema, environment variables, code conventions, deployment pipeline, pre-push hooks, and architecture decisions
 

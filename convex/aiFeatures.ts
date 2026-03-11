@@ -52,10 +52,13 @@ function formatTs(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-async function getOpenAIKey(ctx: any): Promise<string> {
+async function getOpenAIKey(ctx: any): Promise<{ apiKey: string; usingPlatformKey: boolean; userId: string | null }> {
   let apiKey: string | null = null;
+  let usingPlatformKey = false;
 
   const identity = await ctx.auth.getUserIdentity();
+  const userId = identity?.subject ?? null;
+
   if (identity) {
     const userKey = await ctx.runQuery(
       internal.userApiKeysHelpers.getApiKeyByUserId,
@@ -66,6 +69,7 @@ async function getOpenAIKey(ctx: any): Promise<string> {
 
   if (!apiKey) {
     apiKey = process.env.OPENAI_API_KEY ?? null;
+    usingPlatformKey = true;
   }
 
   if (!apiKey) {
@@ -74,7 +78,39 @@ async function getOpenAIKey(ctx: any): Promise<string> {
     );
   }
 
-  return apiKey;
+  return { apiKey, usingPlatformKey, userId };
+}
+
+async function checkAndRecordUsage(
+  ctx: any,
+  usingPlatformKey: boolean,
+  userId: string | null,
+  actionType: string,
+  mode: "check" | "record"
+): Promise<void> {
+  if (!usingPlatformKey || !userId) return;
+
+  const { FREE_CREDIT_BUDGET, CREDIT_COSTS } = await import("./apiUsage");
+  const cost = CREDIT_COSTS[actionType] ?? 1;
+
+  if (mode === "check") {
+    const usedCredits = await ctx.runQuery(
+      internal.apiUsage.getUsedCredits,
+      { userId }
+    );
+    if (usedCredits + cost > FREE_CREDIT_BUDGET) {
+      throw new ConvexError(
+        "You've used all your free platform credits. " +
+          "Add your own OpenAI API key in Settings to continue using ClipCut AI."
+      );
+    }
+  } else {
+    await ctx.runMutation(internal.apiUsage.recordUsage, {
+      userId,
+      action: actionType,
+      creditsUsed: cost,
+    });
+  }
 }
 
 async function callChatGPT(
@@ -115,7 +151,8 @@ export const generateSummary = action({
     projectId: v.id("projects"),
   },
   handler: async (ctx, args) => {
-    const apiKey = await getOpenAIKey(ctx);
+    const { apiKey, usingPlatformKey, userId } = await getOpenAIKey(ctx);
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "check");
 
     const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
       id: args.projectId,
@@ -165,6 +202,7 @@ If there are no notable quotes, omit that section. Keep it concise and useful.`;
       showNotes: result,
     });
 
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "record");
     return { success: true };
   },
 });
@@ -174,7 +212,8 @@ export const identifySpeakers = action({
     projectId: v.id("projects"),
   },
   handler: async (ctx, args) => {
-    const apiKey = await getOpenAIKey(ctx);
+    const { apiKey, usingPlatformKey, userId } = await getOpenAIKey(ctx);
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "check");
 
     const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
       id: args.projectId,
@@ -262,6 +301,7 @@ Each range is [startWordIndex, endWordIndex] inclusive. Only output the JSON arr
       speakers,
     });
 
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "record");
     return { success: true, speakerCount: speakers.length };
   },
 });
@@ -271,7 +311,8 @@ export const extractClips = action({
     projectId: v.id("projects"),
   },
   handler: async (ctx, args) => {
-    const apiKey = await getOpenAIKey(ctx);
+    const { apiKey, usingPlatformKey, userId } = await getOpenAIKey(ctx);
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "check");
 
     const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
       id: args.projectId,
@@ -341,6 +382,7 @@ Only output the JSON array.`;
       clips,
     });
 
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "record");
     return { success: true, clipCount: clips.length };
   },
 });
@@ -350,7 +392,8 @@ export const generateChapters = action({
     projectId: v.id("projects"),
   },
   handler: async (ctx, args) => {
-    const apiKey = await getOpenAIKey(ctx);
+    const { apiKey, usingPlatformKey, userId } = await getOpenAIKey(ctx);
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "check");
 
     const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
       id: args.projectId,
@@ -406,6 +449,7 @@ The "start" value should be in seconds (a number). Only output the JSON array.`;
       chapters,
     });
 
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "record");
     return { success: true, chapterCount: chapters.length };
   },
 });
@@ -419,7 +463,8 @@ export const generateTtsForGap = action({
     end: v.number(),
   },
   handler: async (ctx, args) => {
-    const apiKey = await getOpenAIKey(ctx);
+    const { apiKey, usingPlatformKey, userId } = await getOpenAIKey(ctx);
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "tts", "check");
 
     // Call OpenAI TTS API
     const response = await fetch("https://api.openai.com/v1/audio/speech", {
@@ -448,6 +493,7 @@ export const generateTtsForGap = action({
     const audioBlob = await response.blob();
     const storageId = await ctx.storage.store(audioBlob);
 
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "tts", "record");
     return { storageId, success: true };
   },
 });
@@ -457,7 +503,8 @@ export const suggestTtsGaps = action({
     projectId: v.id("projects"),
   },
   handler: async (ctx, args) => {
-    const apiKey = await getOpenAIKey(ctx);
+    const { apiKey, usingPlatformKey, userId } = await getOpenAIKey(ctx);
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "check");
 
     const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
       id: args.projectId,
@@ -560,6 +607,7 @@ Only output the JSON array.`;
       status: "pending" as const,
     })).filter(s => s.text.length > 0);
 
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "record");
     return { suggestions };
   },
 });
@@ -569,7 +617,8 @@ export const detectZoomRegions = action({
     projectId: v.id("projects"),
   },
   handler: async (ctx, args) => {
-    const apiKey = await getOpenAIKey(ctx);
+    const { apiKey, usingPlatformKey, userId } = await getOpenAIKey(ctx);
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "check");
 
     const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
       id: args.projectId,
@@ -652,6 +701,7 @@ Only output the JSON array.`;
       zoomRegions: regions,
     });
 
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "record");
     return { success: true, regionCount: regions.length };
   },
 });
@@ -661,7 +711,8 @@ export const generateRewriteSuggestions = action({
     projectId: v.id("projects"),
   },
   handler: async (ctx, args) => {
-    const apiKey = await getOpenAIKey(ctx);
+    const { apiKey, usingPlatformKey, userId } = await getOpenAIKey(ctx);
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "check");
 
     const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
       id: args.projectId,
@@ -769,6 +820,7 @@ Only output the JSON array.`;
       rewriteSuggestions: suggestions,
     });
 
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "record");
     return { success: true, suggestionCount: suggestions.length };
   },
 });
