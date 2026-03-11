@@ -28,6 +28,11 @@ import { AudioEnhancement } from "../components/AudioEnhancement";
 import { AIRewriteSuggestions } from "../components/AIRewriteSuggestions";
 import { IntroOutroTemplates } from "../components/IntroOutroTemplates";
 import { PresetsLibrary } from "../components/PresetsLibrary";
+import {
+  PresenceAvatars,
+  ShareDialog,
+  CommentsPanel,
+} from "../components/CollaborativeEditing";
 
 export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
@@ -139,6 +144,11 @@ function ProjectEditorContent() {
   const [editorMode, setEditorMode] = useState<"word" | "text">("word");
   const [introTemplate, setIntroTemplate] = useState<any>(null);
   const [outroTemplate, setOutroTemplate] = useState<any>(null);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const currentUser = useQuery(api.users.currentUser);
+  const projectAccess = useQuery(api.collaboration.canAccessProject, {
+    projectId: id as Id<"projects">,
+  });
   const autoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSavedTranscriptRef = useRef<string>("");
   const lastClickedIndex = useRef<number | null>(null);
@@ -885,6 +895,14 @@ function ProjectEditorContent() {
           >
             Duplicate
           </button>
+          <button
+            onClick={() => setShowShareDialog(true)}
+            className="shrink-0 rounded-md bg-primary/20 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/30"
+            data-testid="share-btn"
+          >
+            Share
+          </button>
+          <PresenceAvatars projectId={id as Id<"projects">} />
           <div className="ml-auto hidden sm:block">
             <UserMenu />
           </div>
@@ -1269,6 +1287,18 @@ function ProjectEditorContent() {
               />
             )}
 
+            {/* Comments */}
+            {hasTranscript && currentUser && (
+              <CommentsPanel
+                projectId={id as Id<"projects">}
+                currentUserId={currentUser.id}
+                transcript={transcript}
+                onJumpToWord={(index) => {
+                  if (transcript[index]) seekToTime(transcript[index].start);
+                }}
+              />
+            )}
+
             {/* Export */}
             {hasTranscript && effectiveVideoUrl && duration > 0 && (
               <ExportButton
@@ -1577,6 +1607,14 @@ function ProjectEditorContent() {
       </main>
 
       {/* Keyboard Shortcuts Modal */}
+      {showShareDialog && (
+        <ShareDialog
+          projectId={id as Id<"projects">}
+          isOwner={projectAccess?.role === "owner"}
+          onClose={() => setShowShareDialog(false)}
+        />
+      )}
+
       {showShortcuts && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-fade-in"

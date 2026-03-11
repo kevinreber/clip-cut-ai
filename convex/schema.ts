@@ -113,4 +113,35 @@ export default defineSchema({
   })
     .index("by_userId", ["userId"])
     .index("by_public", ["isPublic"]),
+  projectCollaborators: defineTable({
+    projectId: v.id("projects"),
+    userId: v.string(),
+    email: v.string(),
+    role: v.union(v.literal("editor"), v.literal("viewer")),
+    invitedBy: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_projectId", ["projectId"])
+    .index("by_userId", ["userId"])
+    .index("by_project_user", ["projectId", "userId"]),
+  projectPresence: defineTable({
+    projectId: v.id("projects"),
+    userId: v.string(),
+    userName: v.string(),
+    color: v.string(),
+    cursorWordIndex: v.optional(v.number()),
+    lastSeenAt: v.number(),
+  })
+    .index("by_projectId", ["projectId"])
+    .index("by_project_user", ["projectId", "userId"]),
+  projectComments: defineTable({
+    projectId: v.id("projects"),
+    userId: v.string(),
+    userName: v.string(),
+    wordIndex: v.optional(v.number()),
+    text: v.string(),
+    resolved: v.boolean(),
+    resolvedBy: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_projectId", ["projectId"]),
 });
