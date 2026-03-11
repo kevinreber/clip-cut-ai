@@ -9,6 +9,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- AI Story Assembly / Auto-Combine Clips — select multiple analyzed projects from the `/compilations` page, choose an assembly mode (Best Story, Highlight Reel, Chronological, Custom), and let AI analyze all transcripts to suggest an optimal narrative order with segment-level reasoning; drag-to-reorder segments, toggle include/exclude per segment, choose transition type (Hard Cut, Crossfade, Fade to Black), and view a color-coded visual timeline of the assembled compilation; "Combine Videos" button added to dashboard
+- E2E test suite for AI Story Assembly feature (route validation, component rendering, error-free loading)
 - Multi-Track Timeline — add B-roll video, audio, image, and text overlay tracks on top of your primary video with drag-and-drop positioning, per-track volume/opacity controls, and layer management
 - Text-to-Speech Gap Filler — when you delete sections from your transcript, AI suggests natural bridging phrases and generates voice audio (via OpenAI TTS) to smoothly connect the remaining content; choose from 6 voices (Alloy, Echo, Fable, Onyx, Nova, Shimmer)
 - AI Zoom / Reframe — automatically detect the best moments for dynamic zoom, pan, and Ken Burns effects; convert landscape video to portrait (9:16) for TikTok/Reels/Shorts with live canvas preview; supports manual region editing with adjustable scale and position

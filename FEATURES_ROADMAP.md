@@ -145,6 +145,69 @@ Features that move ClipCut toward a comprehensive AI-native video editor (Descri
 
 ---
 
+## Tier 4 — Multi-Video Intelligence (Next Frontier)
+
+Features that enable cross-project analysis and multi-video workflows, transforming ClipCut from a single-video editor into an AI-powered content assembly platform.
+
+### 21. AI Story Assembly / Auto-Combine Clips
+- Select multiple uploaded projects and have AI analyze all their transcripts holistically
+- AI suggests a narrative arc: optimal clip order, which segments to keep/cut, and transition points
+- One-click "Combine" to stitch selected segments from multiple videos into a single cohesive output
+- Multiple assembly modes:
+  - **Best Story** — AI reorders clips and trims them to tell the most compelling narrative
+  - **Highlight Reel** — AI picks the top moments from each clip (scored by energy, completeness, topic relevance)
+  - **Chronological** — Concatenate clips in order with smart transitions and filler removal
+  - **Custom** — User reviews AI suggestions, drags to reorder, and manually includes/excludes segments
+- Preview the combined timeline before export, with per-segment trim handles
+- Export the assembled video as a single file via FFmpeg WASM
+
+#### Design Details
+
+**Schema additions:**
+- New `compilations` table:
+  - `userId` — owner
+  - `name` — compilation name
+  - `sourceProjects` — array of `{ projectId, segments: [{ startIndex, endIndex, order }] }`
+  - `assemblyMode` — "best-story" | "highlight-reel" | "chronological" | "custom"
+  - `aiSuggestion` — the raw AI-generated assembly plan (narrative summary, clip order, reasoning)
+  - `finalSequence` — the user-confirmed ordered list of segments to export
+  - `status` — "selecting" | "analyzing" | "reviewed" | "exporting" | "done"
+  - `exportedFileId` — reference to the final combined video in storage
+
+**Backend (Convex):**
+- `compilations.create` mutation — create a new compilation from selected project IDs
+- `compilations.analyze` action — pulls transcripts from all source projects, sends to LLM with a narrative-assembly prompt, returns suggested clip order + trim points + reasoning
+- `compilations.updateSequence` mutation — save user's modified sequence after reviewing AI suggestions
+- `compilations.get` / `compilations.listByUser` queries
+- `compilations.delete` mutation
+
+**AI / LLM prompt strategy:**
+- Send all transcripts with project metadata (name, duration, speaker info, chapters if available)
+- Ask LLM to: (1) identify the key themes/topics across all clips, (2) propose an optimal ordering with reasoning, (3) for each clip suggest start/end trim points to remove weak openings/closings, (4) write a brief narrative summary of the assembled story
+- For "Highlight Reel" mode, reuse the existing clip-extraction scoring logic across all projects
+
+**Frontend:**
+- New `/compilations` dashboard page listing user's compilations
+- "Combine Videos" button on the main dashboard (appears when 2+ projects exist)
+- Project selector modal with multi-select checkboxes
+- Assembly mode picker (Best Story / Highlight Reel / Chronological / Custom)
+- Combined timeline view showing segments from each source video, color-coded by source
+- Drag-to-reorder segments, click to include/exclude, trim handles per segment
+- Preview playback across the combined sequence
+- Export button that runs FFmpeg concatenation client-side
+
+**FFmpeg pipeline:**
+- For each segment: extract the clip from its source video using timestamp-based trim
+- Concatenate all trimmed clips using FFmpeg's concat demuxer
+- Apply crossfade transitions between clips (configurable: cut, crossfade, fade-to-black)
+- Output as single MP4
+
+- **Value:** Very High — this is a unique differentiator. No other AI video tool auto-assembles a narrative from multiple raw clips. Content creators who batch-record (multiple takes, multi-angle, episodic content) would save hours of manual assembly
+- **Complexity:** Very High — cross-project data aggregation, LLM narrative analysis, multi-video FFmpeg concatenation pipeline, new UI for compilation management
+- **Dependencies:** Leverages existing transcript data, AI features infrastructure, clip extraction scoring, and FFmpeg WASM export pipeline
+
+---
+
 ## Implementation Priority Matrix
 
 | # | Feature | Complexity | Value | Priority |
@@ -169,6 +232,7 @@ Features that move ClipCut toward a comprehensive AI-native video editor (Descri
 | 16 | ~~TTS Gap Filler~~ | High | High | P3 - DONE |
 | 15 | ~~Multi-Track Timeline~~ | Very High | Very High | P3 - DONE |
 | 20 | ~~AI Zoom / Reframe~~ | Very High | High | P3 - DONE |
+| 21 | AI Story Assembly / Auto-Combine Clips | Very High | Very High | **P4 - NEXT** |
 
 ---
 
