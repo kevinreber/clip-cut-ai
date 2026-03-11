@@ -9,6 +9,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- GitHub Actions workflow to automatically run Playwright E2E tests on pushes to main and pull requests
+- GitHub Actions workflow for ESLint linting on pushes to main and pull requests
+- ESLint configuration (`eslint.config.js`) with TypeScript support
+- GitHub Actions workflow to verify production builds on pushes to main and pull requests
+- GitHub Actions workflow for dependency security audits on pushes to main, pull requests, and weekly schedule
+- Claude Code pre-commit hook that runs lint and build checks before every commit
+- Compilations route registered in auto-generated route tree
 - AI Story Assembly / Auto-Combine Clips — select multiple analyzed projects from the `/compilations` page, choose an assembly mode (Best Story, Highlight Reel, Chronological, Custom), and let AI analyze all transcripts to suggest an optimal narrative order with segment-level reasoning; drag-to-reorder segments, toggle include/exclude per segment, choose transition type (Hard Cut, Crossfade, Fade to Black), and view a color-coded visual timeline of the assembled compilation; "Combine Videos" button added to dashboard
 - E2E test suite for AI Story Assembly feature (route validation, component rendering, error-free loading)
 - Multi-Track Timeline — add B-roll video, audio, image, and text overlay tracks on top of your primary video with drag-and-drop positioning, per-track volume/opacity controls, and layer management

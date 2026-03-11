@@ -6,7 +6,7 @@ import { useToast } from "./Toast";
 type AssemblyMode = "best-story" | "highlight-reel" | "chronological" | "custom";
 type TransitionType = "cut" | "crossfade" | "fade-to-black";
 
-interface SequenceSegment {
+interface _SequenceSegment {
   projectId: string;
   projectName: string;
   start: number;

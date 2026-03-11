@@ -13,6 +13,7 @@ import { Route as TryRouteImport } from './routes/try'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RecordRouteImport } from './routes/record'
 import { Route as DemoRouteImport } from './routes/demo'
+import { Route as CompilationsRouteImport } from './routes/compilations'
 import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectIdRouteImport } from './routes/project.$id'
@@ -37,6 +38,11 @@ const DemoRoute = DemoRouteImport.update({
   path: '/demo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CompilationsRoute = CompilationsRouteImport.update({
+  id: '/compilations',
+  path: '/compilations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChangelogRoute = ChangelogRouteImport.update({
   id: '/changelog',
   path: '/changelog',
@@ -56,6 +62,7 @@ const ProjectIdRoute = ProjectIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/changelog': typeof ChangelogRoute
+  '/compilations': typeof CompilationsRoute
   '/demo': typeof DemoRoute
   '/record': typeof RecordRoute
   '/settings': typeof SettingsRoute
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/changelog': typeof ChangelogRoute
+  '/compilations': typeof CompilationsRoute
   '/demo': typeof DemoRoute
   '/record': typeof RecordRoute
   '/settings': typeof SettingsRoute
@@ -75,6 +83,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/changelog': typeof ChangelogRoute
+  '/compilations': typeof CompilationsRoute
   '/demo': typeof DemoRoute
   '/record': typeof RecordRoute
   '/settings': typeof SettingsRoute
@@ -86,6 +95,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/changelog'
+    | '/compilations'
     | '/demo'
     | '/record'
     | '/settings'
@@ -95,6 +105,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/changelog'
+    | '/compilations'
     | '/demo'
     | '/record'
     | '/settings'
@@ -104,6 +115,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/changelog'
+    | '/compilations'
     | '/demo'
     | '/record'
     | '/settings'
@@ -114,6 +126,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChangelogRoute: typeof ChangelogRoute
+  CompilationsRoute: typeof CompilationsRoute
   DemoRoute: typeof DemoRoute
   RecordRoute: typeof RecordRoute
   SettingsRoute: typeof SettingsRoute
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/compilations': {
+      id: '/compilations'
+      path: '/compilations'
+      fullPath: '/compilations'
+      preLoaderRoute: typeof CompilationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/changelog': {
       id: '/changelog'
       path: '/changelog'
@@ -178,6 +198,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChangelogRoute: ChangelogRoute,
+  CompilationsRoute: CompilationsRoute,
   DemoRoute: DemoRoute,
   RecordRoute: RecordRoute,
   SettingsRoute: SettingsRoute,

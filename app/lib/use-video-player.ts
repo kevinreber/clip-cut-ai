@@ -38,7 +38,7 @@ export function useVideoPlayer(videoUrl: string | null | undefined) {
   const togglePlayPause = useCallback(() => {
     const video = videoRef.current;
     if (video) {
-      video.paused ? video.play() : video.pause();
+      if (video.paused) { video.play(); } else { video.pause(); }
     }
   }, []);
 

@@ -185,7 +185,7 @@ export function AIZoomReframe({
     return () => cancelAnimationFrame(animationFrame);
   }, [showPreview, regions, currentTime, targetAspectRatio]);
 
-  const selectedRegionData = regions.find((r) => r.id === selectedRegion);
+  const _selectedRegionData = regions.find((r) => r.id === selectedRegion);
   const activeRegion = regions.find(
     (r) => currentTime >= r.start && currentTime <= r.end
   );
