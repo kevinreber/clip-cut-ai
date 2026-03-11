@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- GitHub Actions workflow to automatically run Playwright E2E tests on pushes to main and pull requests
 - Multi-Track Timeline — add B-roll video, audio, image, and text overlay tracks on top of your primary video with drag-and-drop positioning, per-track volume/opacity controls, and layer management
 - Text-to-Speech Gap Filler — when you delete sections from your transcript, AI suggests natural bridging phrases and generates voice audio (via OpenAI TTS) to smoothly connect the remaining content; choose from 6 voices (Alloy, Echo, Fable, Onyx, Nova, Shimmer)
 - AI Zoom / Reframe — automatically detect the best moments for dynamic zoom, pan, and Ken Burns effects; convert landscape video to portrait (9:16) for TikTok/Reels/Shorts with live canvas preview; supports manual region editing with adjustable scale and position
