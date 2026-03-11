@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Multi-Track Timeline — add B-roll video, audio, image, and text overlay tracks on top of your primary video with drag-and-drop positioning, per-track volume/opacity controls, and layer management
+- Text-to-Speech Gap Filler — when you delete sections from your transcript, AI suggests natural bridging phrases and generates voice audio (via OpenAI TTS) to smoothly connect the remaining content; choose from 6 voices (Alloy, Echo, Fable, Onyx, Nova, Shimmer)
+- AI Zoom / Reframe — automatically detect the best moments for dynamic zoom, pan, and Ken Burns effects; convert landscape video to portrait (9:16) for TikTok/Reels/Shorts with live canvas preview; supports manual region editing with adjustable scale and position
+- E2E test suite for Tier 3 features (multi-track timeline, TTS gap filler, AI zoom/reframe)
 - Collaborative Editing — share projects with team members as editors or viewers; real-time presence indicators show who's online with colored avatars; threaded comments anchored to specific transcript words with resolve/delete support; project owner can invite collaborators by email and manage roles from the Share dialog
 - E2E test suite for collaborative editing features (share dialog, comments panel, presence indicators)
 - Built-In Screen Recording — record your screen, camera, or both directly in ClipCut AI using the browser's MediaRecorder API; pause/resume support, live preview, and one-click project creation from recordings (`/record` page)

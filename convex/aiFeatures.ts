@@ -410,6 +410,252 @@ The "start" value should be in seconds (a number). Only output the JSON array.`;
   },
 });
 
+export const generateTtsForGap = action({
+  args: {
+    projectId: v.id("projects"),
+    text: v.string(),
+    voice: v.string(),
+    start: v.number(),
+    end: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = await getOpenAIKey(ctx);
+
+    // Call OpenAI TTS API
+    const response = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "tts-1",
+        input: args.text,
+        voice: args.voice,
+        response_format: "mp3",
+        speed: 1.0,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new ConvexError(
+        `OpenAI TTS API error (${response.status}): ${errorText}`
+      );
+    }
+
+    // Store the audio file in Convex storage
+    const audioBlob = await response.blob();
+    const storageId = await ctx.storage.store(audioBlob);
+
+    return { storageId, success: true };
+  },
+});
+
+export const suggestTtsGaps = action({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = await getOpenAIKey(ctx);
+
+    const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
+      id: args.projectId,
+    });
+    if (!project?.transcript || project.transcript.length === 0) {
+      throw new ConvexError("No transcript available. Analyze the video first.");
+    }
+
+    // Find deleted segments with surrounding context
+    const transcript = project.transcript;
+    const gaps: Array<{
+      startIndex: number;
+      endIndex: number;
+      beforeText: string;
+      afterText: string;
+      start: number;
+      end: number;
+    }> = [];
+
+    let inDeletedRange = false;
+    let rangeStart = -1;
+
+    for (let i = 0; i < transcript.length; i++) {
+      const w = transcript[i];
+      if (w.isDeleted && !inDeletedRange) {
+        inDeletedRange = true;
+        rangeStart = i;
+      } else if (!w.isDeleted && inDeletedRange) {
+        inDeletedRange = false;
+        // Get context: 5 words before and after
+        const beforeWords = transcript
+          .slice(Math.max(0, rangeStart - 5), rangeStart)
+          .filter((w: TranscriptWord) => !w.isDeleted && !w.word.startsWith("[silence"))
+          .map((w: TranscriptWord) => w.word)
+          .join(" ");
+        const afterWords = transcript
+          .slice(i, Math.min(transcript.length, i + 5))
+          .filter((w: TranscriptWord) => !w.isDeleted && !w.word.startsWith("[silence"))
+          .map((w: TranscriptWord) => w.word)
+          .join(" ");
+
+        const gapStart = transcript[rangeStart].start;
+        const gapEnd = transcript[i - 1].end;
+
+        if (gapEnd - gapStart > 0.5 && beforeWords && afterWords) {
+          gaps.push({
+            startIndex: rangeStart,
+            endIndex: i - 1,
+            beforeText: beforeWords,
+            afterText: afterWords,
+            start: gapStart,
+            end: gapEnd,
+          });
+        }
+      }
+    }
+
+    if (gaps.length === 0) {
+      return { suggestions: [] };
+    }
+
+    // Ask GPT to suggest bridging text for each gap
+    const gapDescriptions = gaps
+      .slice(0, 8) // Limit to 8 gaps
+      .map(
+        (g, i) =>
+          `Gap ${i + 1} (${g.start.toFixed(1)}s-${g.end.toFixed(1)}s): Before: "${g.beforeText}" → After: "${g.afterText}"`
+      )
+      .join("\n");
+
+    const systemPrompt = `You are an expert speech writer. Given gaps in a transcript where words were deleted, suggest short bridging phrases that smoothly connect the remaining text. The phrases should sound natural and match the speaker's style.
+
+Rules:
+- Keep bridging text very short (2-8 words)
+- Make it sound like natural speech, not written prose
+- If the gap can be bridged with just a connecting word (and, so, then), use that
+- Some gaps may not need bridging — return empty string for those
+
+Respond with ONLY a JSON array of bridging texts, one per gap:
+["bridging text 1", "bridging text 2", ...]
+
+Only output the JSON array.`;
+
+    const result = await callChatGPT(apiKey, systemPrompt, gapDescriptions);
+
+    let bridgingTexts: string[];
+    try {
+      const jsonStr = result.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+      bridgingTexts = JSON.parse(jsonStr);
+    } catch {
+      throw new ConvexError("Failed to parse TTS gap suggestions from AI response.");
+    }
+
+    const suggestions = gaps.slice(0, 8).map((g, i) => ({
+      id: `tts-${Date.now()}-${i}`,
+      text: bridgingTexts[i] || "",
+      start: g.start,
+      end: g.end,
+      voice: "alloy",
+      status: "pending" as const,
+    })).filter(s => s.text.length > 0);
+
+    return { suggestions };
+  },
+});
+
+export const detectZoomRegions = action({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const apiKey = await getOpenAIKey(ctx);
+
+    const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
+      id: args.projectId,
+    });
+    if (!project?.transcript || project.transcript.length === 0) {
+      throw new ConvexError("No transcript available. Analyze the video first.");
+    }
+
+    const timestampedText = transcriptToTimestampedText(project.transcript);
+
+    const systemPrompt = `You are an expert video editor specializing in dynamic zoom and reframing effects. Given a timestamped transcript, identify the best moments for zoom effects to make the video more engaging.
+
+Consider:
+- Zoom in on key points, revelations, or emphatic statements
+- Ken Burns effect for longer descriptive sections
+- Zoom out for context-setting or concluding statements
+- Pan effects for transitions between topics
+
+For each region, provide:
+- start: Start time in seconds
+- end: End time in seconds
+- type: One of "zoom-in", "zoom-out", "pan", "ken-burns"
+- reason: Brief explanation
+
+Rules:
+- Suggest 3-8 zoom regions depending on video length
+- Each region should be 2-15 seconds long
+- Don't overlap regions
+- Space them out for visual variety
+
+Respond with ONLY a JSON array:
+[{"start": 10.5, "end": 15.2, "type": "zoom-in", "reason": "Key insight moment"}]
+
+Only output the JSON array.`;
+
+    const result = await callChatGPT(apiKey, systemPrompt, timestampedText);
+
+    let regionsRaw: Array<{
+      start: number;
+      end: number;
+      type: "zoom-in" | "zoom-out" | "pan" | "ken-burns";
+      reason: string;
+    }>;
+    try {
+      const jsonStr = result.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+      regionsRaw = JSON.parse(jsonStr);
+    } catch {
+      throw new ConvexError("Failed to parse zoom region data from AI response.");
+    }
+
+    if (!Array.isArray(regionsRaw) || regionsRaw.length === 0) {
+      throw new ConvexError("AI did not identify any zoom regions.");
+    }
+
+    // Generate zoom parameters based on type
+    const regions = regionsRaw.map((r, i) => {
+      const defaults = {
+        "zoom-in": { fromScale: 1.0, toScale: 1.4, fromX: 0.5, fromY: 0.5, toX: 0.5, toY: 0.4 },
+        "zoom-out": { fromScale: 1.4, toScale: 1.0, fromX: 0.5, fromY: 0.4, toX: 0.5, toY: 0.5 },
+        "pan": { fromScale: 1.2, toScale: 1.2, fromX: 0.3, fromY: 0.5, toX: 0.7, toY: 0.5 },
+        "ken-burns": { fromScale: 1.0, toScale: 1.3, fromX: 0.3, fromY: 0.3, toX: 0.7, toY: 0.6 },
+      };
+      const d = defaults[r.type] || defaults["zoom-in"];
+      return {
+        id: `zoom-${Date.now()}-${i}`,
+        start: r.start,
+        end: r.end,
+        type: r.type,
+        fromX: d.fromX,
+        fromY: d.fromY,
+        fromScale: d.fromScale,
+        toX: d.toX,
+        toY: d.toY,
+        toScale: d.toScale,
+      };
+    });
+
+    await ctx.runMutation(internal.aiFeatureHelpers.saveZoomRegions, {
+      projectId: args.projectId,
+      zoomRegions: regions,
+    });
+
+    return { success: true, regionCount: regions.length };
+  },
+});
+
 export const generateRewriteSuggestions = action({
   args: {
     projectId: v.id("projects"),

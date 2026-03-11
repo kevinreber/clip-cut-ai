@@ -17,6 +17,9 @@ import { AIRewriteSuggestions } from "../components/AIRewriteSuggestions";
 import { AudioEnhancement } from "../components/AudioEnhancement";
 import { IntroOutroTemplates } from "../components/IntroOutroTemplates";
 import { PresetsLibrary } from "../components/PresetsLibrary";
+import { MultiTrackTimeline } from "../components/MultiTrackTimeline";
+import { TtsGapFiller } from "../components/TtsGapFiller";
+import { AIZoomReframe } from "../components/AIZoomReframe";
 import {
   generateSrt,
   generateVtt,
@@ -176,6 +179,9 @@ function DemoPage() {
   const [editorMode, setEditorMode] = useState<"word" | "text">("word");
   const [introTemplate, setIntroTemplate] = useState<any>(null);
   const [outroTemplate, setOutroTemplate] = useState<any>(null);
+  const [demoTracks, setDemoTracks] = useState<any[]>([]);
+  const [demoTtsSegments, setDemoTtsSegments] = useState<any[]>([]);
+  const [demoZoomRegions, setDemoZoomRegions] = useState<any[]>([]);
   const lastClickedIndex = useRef<number | null>(null);
 
   const keptSegments = useMemo(
@@ -758,6 +764,48 @@ function DemoPage() {
               videoUrl={null}
               onEnhancedAudio={() => {}}
             />
+
+            {/* Multi-Track Timeline (demo) */}
+            {duration > 0 && (
+              <MultiTrackTimeline
+                tracks={demoTracks}
+                duration={duration}
+                currentTime={currentTime}
+                onSeek={seekToTime}
+                onTracksChange={setDemoTracks}
+              />
+            )}
+
+            {/* TTS Gap Filler (demo) */}
+            <TtsGapFiller
+              transcript={transcript}
+              ttsSegments={demoTtsSegments}
+              onSuggestGaps={async () => {
+                addToast("TTS gap detection requires a project with an API key.", "info");
+                return { suggestions: [] };
+              }}
+              onGenerateTts={async () => {
+                addToast("TTS generation requires a project with an API key.", "info");
+              }}
+              onUpdateSegments={setDemoTtsSegments}
+              isSuggesting={false}
+            />
+
+            {/* AI Zoom / Reframe (demo) */}
+            {duration > 0 && (
+              <AIZoomReframe
+                zoomRegions={demoZoomRegions}
+                duration={duration}
+                currentTime={currentTime}
+                videoUrl={null}
+                onGenerate={async () => {
+                  addToast("AI zoom detection requires a project with an API key.", "info");
+                }}
+                isGenerating={false}
+                onUpdateRegions={setDemoZoomRegions}
+                onSeek={seekToTime}
+              />
+            )}
 
             {/* Animated Captions */}
             <AnimatedCaptions
