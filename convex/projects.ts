@@ -292,3 +292,91 @@ export const updateCaptionStyle = mutation({
     });
   },
 });
+
+export const updateTracks = mutation({
+  args: {
+    projectId: v.id("projects"),
+    tracks: v.array(
+      v.object({
+        id: v.string(),
+        name: v.string(),
+        type: v.union(
+          v.literal("video"),
+          v.literal("audio"),
+          v.literal("image"),
+          v.literal("text")
+        ),
+        fileId: v.optional(v.id("_storage")),
+        start: v.number(),
+        end: v.number(),
+        layer: v.number(),
+        volume: v.optional(v.number()),
+        opacity: v.optional(v.number()),
+        text: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    await ctx.db.patch(args.projectId, { tracks: args.tracks });
+  },
+});
+
+export const updateTtsSegments = mutation({
+  args: {
+    projectId: v.id("projects"),
+    ttsSegments: v.array(
+      v.object({
+        id: v.string(),
+        text: v.string(),
+        start: v.number(),
+        end: v.number(),
+        voice: v.string(),
+        status: v.union(
+          v.literal("pending"),
+          v.literal("generating"),
+          v.literal("ready"),
+          v.literal("error")
+        ),
+        audioFileId: v.optional(v.id("_storage")),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    await ctx.db.patch(args.projectId, { ttsSegments: args.ttsSegments });
+  },
+});
+
+export const updateZoomRegions = mutation({
+  args: {
+    projectId: v.id("projects"),
+    zoomRegions: v.array(
+      v.object({
+        id: v.string(),
+        start: v.number(),
+        end: v.number(),
+        type: v.union(
+          v.literal("zoom-in"),
+          v.literal("zoom-out"),
+          v.literal("pan"),
+          v.literal("ken-burns")
+        ),
+        fromX: v.number(),
+        fromY: v.number(),
+        fromScale: v.number(),
+        toX: v.number(),
+        toY: v.number(),
+        toScale: v.number(),
+        aspectRatio: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    await ctx.db.patch(args.projectId, { zoomRegions: args.zoomRegions });
+  },
+});

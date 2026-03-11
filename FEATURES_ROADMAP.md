@@ -166,9 +166,9 @@ Features that move ClipCut toward a comprehensive AI-native video editor (Descri
 | 19 | ~~Templates & Presets Library~~ | Low-Med | Medium | P2 - DONE |
 | 17 | ~~Built-In Screen Recording~~ | Med-High | High | P3 - DONE |
 | 18 | ~~Collaborative Editing~~ | Medium | High | P3 - DONE |
-| 16 | TTS Gap Filler | High | High | P3 |
-| 15 | Multi-Track Timeline | Very High | Very High | P3 |
-| 20 | AI Zoom / Reframe | Very High | High | P3 |
+| 16 | ~~TTS Gap Filler~~ | High | High | P3 - DONE |
+| 15 | ~~Multi-Track Timeline~~ | Very High | Very High | P3 - DONE |
+| 20 | ~~AI Zoom / Reframe~~ | Very High | High | P3 - DONE |
 
 ---
 

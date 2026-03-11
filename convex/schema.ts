@@ -78,6 +78,70 @@ export default defineSchema({
         })
       )
     ),
+    // Multi-Track Timeline tracks
+    tracks: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          name: v.string(),
+          type: v.union(
+            v.literal("video"),
+            v.literal("audio"),
+            v.literal("image"),
+            v.literal("text")
+          ),
+          fileId: v.optional(v.id("_storage")),
+          start: v.number(),
+          end: v.number(),
+          layer: v.number(),
+          volume: v.optional(v.number()),
+          opacity: v.optional(v.number()),
+          text: v.optional(v.string()),
+        })
+      )
+    ),
+    // TTS Gap Filler segments
+    ttsSegments: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          text: v.string(),
+          start: v.number(),
+          end: v.number(),
+          voice: v.string(),
+          status: v.union(
+            v.literal("pending"),
+            v.literal("generating"),
+            v.literal("ready"),
+            v.literal("error")
+          ),
+          audioFileId: v.optional(v.id("_storage")),
+        })
+      )
+    ),
+    // AI Zoom / Reframe regions
+    zoomRegions: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          start: v.number(),
+          end: v.number(),
+          type: v.union(
+            v.literal("zoom-in"),
+            v.literal("zoom-out"),
+            v.literal("pan"),
+            v.literal("ken-burns")
+          ),
+          fromX: v.number(),
+          fromY: v.number(),
+          fromScale: v.number(),
+          toX: v.number(),
+          toY: v.number(),
+          toScale: v.number(),
+          aspectRatio: v.optional(v.string()),
+        })
+      )
+    ),
     createdAt: v.number(),
   }).index("by_userId", ["userId"]),
   exportPresets: defineTable({

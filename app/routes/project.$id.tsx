@@ -33,6 +33,9 @@ import {
   ShareDialog,
   CommentsPanel,
 } from "../components/CollaborativeEditing";
+import { MultiTrackTimeline } from "../components/MultiTrackTimeline";
+import { TtsGapFiller } from "../components/TtsGapFiller";
+import { AIZoomReframe } from "../components/AIZoomReframe";
 
 export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
@@ -86,6 +89,12 @@ function ProjectEditorContent() {
   const identifySpeakers = useAction(api.aiFeatures.identifySpeakers);
   const extractClips = useAction(api.aiFeatures.extractClips);
   const generateRewriteSuggestions = useAction(api.aiFeatures.generateRewriteSuggestions);
+  const suggestTtsGaps = useAction(api.aiFeatures.suggestTtsGaps);
+  const generateTtsForGap = useAction(api.aiFeatures.generateTtsForGap);
+  const detectZoomRegions = useAction(api.aiFeatures.detectZoomRegions);
+  const updateTracks = useMutation(api.projects.updateTracks);
+  const updateTtsSegments = useMutation(api.projects.updateTtsSegments);
+  const updateZoomRegions = useMutation(api.projects.updateZoomRegions);
   const updateProject = useMutation(api.projects.updateCaptionStyle);
   const myPresets = useQuery(api.cleanupPresets.listMine);
   const communityPresets = useQuery(api.cleanupPresets.listCommunity);
@@ -144,6 +153,8 @@ function ProjectEditorContent() {
   const [editorMode, setEditorMode] = useState<"word" | "text">("word");
   const [introTemplate, setIntroTemplate] = useState<any>(null);
   const [outroTemplate, setOutroTemplate] = useState<any>(null);
+  const [suggestingTtsGaps, setSuggestingTtsGaps] = useState(false);
+  const [detectingZoomRegions, setDetectingZoomRegions] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const currentUser = useQuery(api.users.currentUser);
   const projectAccess = useQuery(api.collaboration.canAccessProject, {
@@ -783,6 +794,84 @@ function ProjectEditorContent() {
     addToast(`Preset "${preset.name}" applied!`, "success");
   }, [project, updateCustomFillerWords, updateSilenceThreshold, incrementPresetUsage, addToast]);
 
+  // Multi-Track Timeline handlers
+  const handleTracksChange = useCallback((tracks: any[]) => {
+    if (project) {
+      updateTracks({ projectId: project._id, tracks });
+    }
+  }, [project, updateTracks]);
+
+  // TTS Gap Filler handlers
+  const handleSuggestTtsGaps = useCallback(async () => {
+    if (!project) return { suggestions: [] };
+    setSuggestingTtsGaps(true);
+    try {
+      const result = await suggestTtsGaps({ projectId: project._id });
+      addToast(`${result.suggestions.length} gap${result.suggestions.length !== 1 ? "s" : ""} found!`, "success");
+      return result;
+    } catch (err: any) {
+      const message =
+        err instanceof ConvexError
+          ? (err.data as string)
+          : err.message || "Failed to suggest TTS gaps.";
+      addToast(message, "error");
+      return { suggestions: [] };
+    } finally {
+      setSuggestingTtsGaps(false);
+    }
+  }, [project, suggestTtsGaps, addToast]);
+
+  const handleGenerateTts = useCallback(async (segment: any) => {
+    if (!project) return;
+    try {
+      await generateTtsForGap({
+        projectId: project._id,
+        text: segment.text,
+        voice: segment.voice,
+        start: segment.start,
+        end: segment.end,
+      });
+      addToast("TTS audio generated!", "success");
+    } catch (err: any) {
+      const message =
+        err instanceof ConvexError
+          ? (err.data as string)
+          : err.message || "Failed to generate TTS audio.";
+      addToast(message, "error");
+      throw err;
+    }
+  }, [project, generateTtsForGap, addToast]);
+
+  const handleUpdateTtsSegments = useCallback((segments: any[]) => {
+    if (project) {
+      updateTtsSegments({ projectId: project._id, ttsSegments: segments });
+    }
+  }, [project, updateTtsSegments]);
+
+  // AI Zoom / Reframe handlers
+  const handleDetectZoomRegions = useCallback(async () => {
+    if (!project) return;
+    setDetectingZoomRegions(true);
+    try {
+      await detectZoomRegions({ projectId: project._id });
+      addToast("Zoom regions detected!", "success");
+    } catch (err: any) {
+      const message =
+        err instanceof ConvexError
+          ? (err.data as string)
+          : err.message || "Failed to detect zoom regions.";
+      addToast(message, "error");
+    } finally {
+      setDetectingZoomRegions(false);
+    }
+  }, [project, detectZoomRegions, addToast]);
+
+  const handleUpdateZoomRegions = useCallback((regions: any[]) => {
+    if (project) {
+      updateZoomRegions({ projectId: project._id, zoomRegions: regions });
+    }
+  }, [project, updateZoomRegions]);
+
   if (!project) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-surface">
@@ -1186,6 +1275,17 @@ function ProjectEditorContent() {
               />
             )}
 
+            {/* Multi-Track Timeline */}
+            {hasTranscript && duration > 0 && (
+              <MultiTrackTimeline
+                tracks={project.tracks}
+                duration={duration}
+                currentTime={currentTime}
+                onSeek={seekToTime}
+                onTracksChange={handleTracksChange}
+              />
+            )}
+
             {/* Filler Word Frequency Chart */}
             {hasTranscript && <FillerWordChart transcript={transcript} />}
 
@@ -1247,6 +1347,32 @@ function ProjectEditorContent() {
               <AudioEnhancement
                 videoUrl={effectiveVideoUrl}
                 onEnhancedAudio={handleEnhancedAudio}
+              />
+            )}
+
+            {/* TTS Gap Filler */}
+            {hasTranscript && (
+              <TtsGapFiller
+                transcript={transcript}
+                ttsSegments={project.ttsSegments}
+                onSuggestGaps={handleSuggestTtsGaps}
+                onGenerateTts={handleGenerateTts}
+                onUpdateSegments={handleUpdateTtsSegments}
+                isSuggesting={suggestingTtsGaps}
+              />
+            )}
+
+            {/* AI Zoom / Reframe */}
+            {hasTranscript && duration > 0 && (
+              <AIZoomReframe
+                zoomRegions={project.zoomRegions}
+                duration={duration}
+                currentTime={currentTime}
+                videoUrl={effectiveVideoUrl}
+                onGenerate={handleDetectZoomRegions}
+                isGenerating={detectingZoomRegions}
+                onUpdateRegions={handleUpdateZoomRegions}
+                onSeek={seekToTime}
               />
             )}
 
