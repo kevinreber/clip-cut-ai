@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Expanded CLAUDE.md with comprehensive codebase documentation covering project structure, database schema, environment variables, code conventions, deployment pipeline, pre-push hooks, and architecture decisions
+
 ### Added
 - GitHub Actions workflow to automatically run Playwright E2E tests on pushes to main and pull requests
 - GitHub Actions workflow for ESLint linting on pushes to main and pull requests
