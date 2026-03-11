@@ -16,7 +16,7 @@ export function AuthForm() {
     setLoading(true);
     try {
       await signIn("password", { email, password, flow });
-    } catch (err: any) {
+    } catch (_err) {
       setError(
         flow === "signIn"
           ? "Invalid email or password."
@@ -31,7 +31,7 @@ export function AuthForm() {
     setError(null);
     try {
       await signIn("google");
-    } catch (err: any) {
+    } catch (_err) {
       setError("Could not sign in with Google. Please try again.");
     }
   }
