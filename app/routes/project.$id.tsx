@@ -36,6 +36,7 @@ import {
 import { MultiTrackTimeline } from "../components/MultiTrackTimeline";
 import { TtsGapFiller } from "../components/TtsGapFiller";
 import { AIZoomReframe } from "../components/AIZoomReframe";
+import { CreditsBadge } from "../components/CreditsBadge";
 
 export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
@@ -1285,6 +1286,9 @@ function ProjectEditorContent() {
 
             {/* Filler Word Frequency Chart */}
             {hasTranscript && <FillerWordChart transcript={transcript} />}
+
+            {/* Platform Credits Budget */}
+            {hasTranscript && <CreditsBadge />}
 
             {/* AI Summary & Show Notes */}
             {hasTranscript && (

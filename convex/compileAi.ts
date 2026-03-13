@@ -41,10 +41,13 @@ function formatTs(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-async function getOpenAIKey(ctx: any): Promise<string> {
+async function getOpenAIKey(ctx: any): Promise<{ apiKey: string; usingPlatformKey: boolean; userId: string | null }> {
   let apiKey: string | null = null;
+  let usingPlatformKey = false;
 
   const identity = await ctx.auth.getUserIdentity();
+  const userId = identity?.subject ?? null;
+
   if (identity) {
     const userKey = await ctx.runQuery(
       internal.userApiKeysHelpers.getApiKeyByUserId,
@@ -55,6 +58,7 @@ async function getOpenAIKey(ctx: any): Promise<string> {
 
   if (!apiKey) {
     apiKey = process.env.OPENAI_API_KEY ?? null;
+    usingPlatformKey = true;
   }
 
   if (!apiKey) {
@@ -63,7 +67,7 @@ async function getOpenAIKey(ctx: any): Promise<string> {
     );
   }
 
-  return apiKey;
+  return { apiKey, usingPlatformKey, userId };
 }
 
 async function callChatGPT(
@@ -104,7 +108,23 @@ export const analyzeForAssembly = action({
     compilationId: v.id("compilations"),
   },
   handler: async (ctx, args) => {
-    const apiKey = await getOpenAIKey(ctx);
+    const { apiKey, usingPlatformKey, userId } = await getOpenAIKey(ctx);
+
+    // Enforce budget when using the platform key
+    if (usingPlatformKey && userId) {
+      const { FREE_CREDIT_BUDGET, CREDIT_COSTS } = await import("./apiUsage");
+      const usedCredits = await ctx.runQuery(
+        internal.apiUsage.getUsedCredits,
+        { userId }
+      );
+      const cost = CREDIT_COSTS.compilation;
+      if (usedCredits + cost > FREE_CREDIT_BUDGET) {
+        throw new ConvexError(
+          "You've used all your free platform credits. " +
+            "Add your own OpenAI API key in Settings to continue using ClipCut AI."
+        );
+      }
+    }
 
     // Get the compilation
     const compilation = await ctx.runQuery(api.compilations.get, {
@@ -264,6 +284,16 @@ The "videoIndex" is 0-based matching the video order provided. Only output the J
       id: args.compilationId,
       aiSuggestion,
     });
+
+    // Record usage if using platform key
+    if (usingPlatformKey && userId) {
+      const { CREDIT_COSTS } = await import("./apiUsage");
+      await ctx.runMutation(internal.apiUsage.recordUsage, {
+        userId,
+        action: "compilation",
+        creditsUsed: CREDIT_COSTS.compilation,
+      });
+    }
 
     return {
       success: true,

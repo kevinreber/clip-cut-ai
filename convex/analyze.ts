@@ -157,6 +157,7 @@ export const analyzeVideo = action({
   handler: async (ctx, args) => {
     // Check for user's own API key first, then fall back to platform key
     let apiKey: string | null = null;
+    let usingPlatformKey = false;
 
     const identity = await ctx.auth.getUserIdentity();
     if (identity) {
@@ -171,6 +172,7 @@ export const analyzeVideo = action({
 
     if (!apiKey) {
       apiKey = process.env.OPENAI_API_KEY ?? null;
+      usingPlatformKey = true;
     }
 
     if (!apiKey) {
@@ -178,6 +180,22 @@ export const analyzeVideo = action({
         "No OpenAI API key available. Add your own key in Settings, " +
           "or contact the site admin."
       );
+    }
+
+    // Enforce budget when using the platform key
+    if (usingPlatformKey && identity) {
+      const { FREE_CREDIT_BUDGET, CREDIT_COSTS } = await import("./apiUsage");
+      const usedCredits = await ctx.runQuery(
+        internal.apiUsage.getUsedCredits,
+        { userId: identity.subject }
+      );
+      const cost = CREDIT_COSTS.whisper;
+      if (usedCredits + cost > FREE_CREDIT_BUDGET) {
+        throw new ConvexError(
+          "You've used all your free platform credits. " +
+            "Add your own OpenAI API key in Settings to continue using ClipCut AI."
+        );
+      }
     }
 
     // Set status to analyzing
@@ -274,6 +292,16 @@ export const analyzeVideo = action({
         projectId: args.projectId,
         transcript,
       });
+
+      // Record usage if using platform key
+      if (usingPlatformKey && identity) {
+        const { CREDIT_COSTS } = await import("./apiUsage");
+        await ctx.runMutation(internal.apiUsage.recordUsage, {
+          userId: identity.subject,
+          action: "whisper",
+          creditsUsed: CREDIT_COSTS.whisper,
+        });
+      }
 
       return { success: true, wordCount: transcript.length };
     } catch (error) {
