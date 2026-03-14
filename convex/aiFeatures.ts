@@ -824,3 +824,91 @@ Only output the JSON array.`;
     return { success: true, suggestionCount: suggestions.length };
   },
 });
+
+export const repurposeContent = action({
+  args: {
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    const { apiKey, usingPlatformKey, userId } = await getOpenAIKey(ctx);
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "check");
+
+    const project = await ctx.runQuery(internal.analyzeHelpers.getProject, {
+      id: args.projectId,
+    });
+    if (!project?.transcript || project.transcript.length === 0) {
+      throw new ConvexError("No transcript available. Analyze the video first.");
+    }
+
+    const text = transcriptToText(project.transcript);
+
+    // Use summary & chapters if available for richer context
+    const contextParts = [`Transcript:\n${text}`];
+    if (project.summary) {
+      contextParts.push(`Existing Summary:\n${project.summary}`);
+    }
+    if (project.chapters && project.chapters.length > 0) {
+      const chaptersText = project.chapters
+        .map((c: { title: string; start: number }) => `- ${formatTs(c.start)} ${c.title}`)
+        .join("\n");
+      contextParts.push(`Chapters:\n${chaptersText}`);
+    }
+    const fullContext = contextParts.join("\n\n---\n\n");
+
+    const systemPrompt = `You are an expert content strategist who repurposes video content into multiple formats. Given a video transcript (and optionally a summary and chapters), generate all of the following formats.
+
+Respond with ONLY a JSON object (no markdown fences), with these exact keys:
+
+{
+  "blogPost": "A well-structured blog post (300-600 words) with a compelling title as the first line (prefixed with '# '), subheadings (prefixed with '## '), and paragraphs. Write in the speaker's voice. Include key insights and actionable takeaways.",
+  "linkedinPost": "A professional LinkedIn post (150-250 words). Start with a hook line. Use short paragraphs. End with a question or call-to-action. Include 3-5 relevant hashtags at the end.",
+  "twitterThread": "A Twitter/X thread of 4-8 tweets. Format each tweet on its own line, prefixed with the tweet number (e.g., '1/ ', '2/ '). First tweet should hook the reader. Last tweet should summarize or link back. Each tweet must be under 280 characters.",
+  "newsletterSnippet": "An email newsletter section (100-200 words). Start with a brief intro sentence, then 3-5 bullet points of key takeaways, then a closing sentence encouraging readers to watch the full video.",
+  "youtubeDescription": "A YouTube video description (150-300 words). Include: a 2-sentence hook, key topics covered (bulleted), timestamps if chapters are available, and a call-to-action to like/subscribe."
+}
+
+Rules:
+- Preserve the speaker's tone and style
+- Each format should stand alone — don't reference the other formats
+- Focus on the most compelling and valuable content
+- Make each format platform-appropriate (LinkedIn is professional, Twitter is punchy, etc.)
+- Only output the JSON object, nothing else`;
+
+    const result = await callChatGPT(apiKey, systemPrompt, fullContext);
+
+    let parsed: {
+      blogPost: string;
+      linkedinPost: string;
+      twitterThread: string;
+      newsletterSnippet: string;
+      youtubeDescription: string;
+    };
+    try {
+      const jsonStr = result.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      throw new ConvexError("Failed to parse repurposed content from AI response.");
+    }
+
+    if (!parsed.blogPost || !parsed.linkedinPost || !parsed.twitterThread) {
+      throw new ConvexError("AI did not generate all required content formats.");
+    }
+
+    const repurposeContent = {
+      blogPost: parsed.blogPost,
+      linkedinPost: parsed.linkedinPost,
+      twitterThread: parsed.twitterThread,
+      newsletterSnippet: parsed.newsletterSnippet || "",
+      youtubeDescription: parsed.youtubeDescription || "",
+      generatedAt: Date.now(),
+    };
+
+    await ctx.runMutation(internal.aiFeatureHelpers.saveRepurposeContent, {
+      projectId: args.projectId,
+      repurposeContent,
+    });
+
+    await checkAndRecordUsage(ctx, usingPlatformKey, userId, "ai_feature", "record");
+    return { success: true };
+  },
+});

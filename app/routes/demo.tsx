@@ -14,6 +14,7 @@ import { SpeakerDiarization } from "../components/SpeakerDiarization";
 import { ClipExtractor } from "../components/ClipExtractor";
 import { AnimatedCaptions } from "../components/AnimatedCaptions";
 import { AIRewriteSuggestions } from "../components/AIRewriteSuggestions";
+import { ContentRepurpose } from "../components/ContentRepurpose";
 import { AudioEnhancement } from "../components/AudioEnhancement";
 import { IntroOutroTemplates } from "../components/IntroOutroTemplates";
 import { PresetsLibrary } from "../components/PresetsLibrary";
@@ -744,6 +745,15 @@ function DemoPage() {
               onSeek={seekToTime}
               currentTime={currentTime}
               videoDuration={duration}
+            />
+
+            {/* Content Repurposing (demo — no backend, UI only) */}
+            <ContentRepurpose
+              content={undefined}
+              onGenerate={async () => {
+                addToast("Content repurposing requires a project with an API key.", "info");
+              }}
+              isGenerating={false}
             />
 
             {/* AI Rewrite Suggestions (demo — no backend, UI only) */}

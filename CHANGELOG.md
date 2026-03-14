@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Content Repurposing Assistant — one-click AI-powered conversion of video transcripts into 5 platform-ready formats: blog post, LinkedIn post, Twitter/X thread, email newsletter snippet, and YouTube description; tabbed interface with quick-copy buttons for each format
 - Free platform credits system — new users get 15 free credits to try AI features (transcription, summaries, chapters, clips, TTS, etc.) using the shared platform key; once credits are exhausted, users are prompted to add their own OpenAI API key in Settings for unlimited access
 - Credits budget indicator shown in Settings and the project editor with progress bar, remaining count, and contextual nudges when credits are running low or exhausted
 - BYOK (Bring Your Own Key) users bypass all credit limits entirely
