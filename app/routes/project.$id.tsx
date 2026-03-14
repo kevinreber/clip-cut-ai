@@ -36,6 +36,7 @@ import {
 import { MultiTrackTimeline } from "../components/MultiTrackTimeline";
 import { TtsGapFiller } from "../components/TtsGapFiller";
 import { AIZoomReframe } from "../components/AIZoomReframe";
+import { ContentRepurpose } from "../components/ContentRepurpose";
 import { CreditsBadge } from "../components/CreditsBadge";
 
 export const Route = createFileRoute("/project/$id")({
@@ -93,6 +94,7 @@ function ProjectEditorContent() {
   const suggestTtsGaps = useAction(api.aiFeatures.suggestTtsGaps);
   const generateTtsForGap = useAction(api.aiFeatures.generateTtsForGap);
   const detectZoomRegions = useAction(api.aiFeatures.detectZoomRegions);
+  const repurposeContent = useAction(api.aiFeatures.repurposeContent);
   const updateTracks = useMutation(api.projects.updateTracks);
   const updateTtsSegments = useMutation(api.projects.updateTtsSegments);
   const updateZoomRegions = useMutation(api.projects.updateZoomRegions);
@@ -156,6 +158,7 @@ function ProjectEditorContent() {
   const [outroTemplate, setOutroTemplate] = useState<any>(null);
   const [suggestingTtsGaps, setSuggestingTtsGaps] = useState(false);
   const [detectingZoomRegions, setDetectingZoomRegions] = useState(false);
+  const [repurposingContent, setRepurposingContent] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const currentUser = useQuery(api.users.currentUser);
   const projectAccess = useQuery(api.collaboration.canAccessProject, {
@@ -725,6 +728,23 @@ function ProjectEditorContent() {
       setGeneratingRewrites(false);
     }
   }, [project, generateRewriteSuggestions, addToast]);
+
+  const handleRepurposeContent = useCallback(async () => {
+    if (!project) return;
+    setRepurposingContent(true);
+    try {
+      await repurposeContent({ projectId: project._id });
+      addToast("Content repurposed into 5 formats!", "success");
+    } catch (err: any) {
+      const message =
+        err instanceof ConvexError
+          ? (err.data as string)
+          : err.message || "Failed to repurpose content.";
+      addToast(message, "error");
+    } finally {
+      setRepurposingContent(false);
+    }
+  }, [project, repurposeContent, addToast]);
 
   const handleAcceptRewrite = useCallback(
     (suggestion: { startIndex: number; endIndex: number }) => {
@@ -1340,6 +1360,15 @@ function ProjectEditorContent() {
                 onGenerate={handleGenerateRewrites}
                 isGenerating={generatingRewrites}
                 onAccept={handleAcceptRewrite}
+              />
+            )}
+
+            {/* Content Repurposing */}
+            {hasTranscript && (
+              <ContentRepurpose
+                content={project.repurposeContent}
+                onGenerate={handleRepurposeContent}
+                isGenerating={repurposingContent}
               />
             )}
 

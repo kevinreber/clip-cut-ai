@@ -150,6 +150,17 @@ export default defineSchema({
         })
       )
     ),
+    // Content Repurposing outputs
+    repurposeContent: v.optional(
+      v.object({
+        blogPost: v.string(),
+        linkedinPost: v.string(),
+        twitterThread: v.string(),
+        newsletterSnippet: v.string(),
+        youtubeDescription: v.string(),
+        generatedAt: v.number(),
+      })
+    ),
     createdAt: v.number(),
   }).index("by_userId", ["userId"]),
   exportPresets: defineTable({

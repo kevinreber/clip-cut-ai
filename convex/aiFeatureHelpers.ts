@@ -160,6 +160,25 @@ export const saveZoomRegions = internalMutation({
   },
 });
 
+export const saveRepurposeContent = internalMutation({
+  args: {
+    projectId: v.id("projects"),
+    repurposeContent: v.object({
+      blogPost: v.string(),
+      linkedinPost: v.string(),
+      twitterThread: v.string(),
+      newsletterSnippet: v.string(),
+      youtubeDescription: v.string(),
+      generatedAt: v.number(),
+    }),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.projectId, {
+      repurposeContent: args.repurposeContent,
+    });
+  },
+});
+
 export const saveRewriteSuggestions = internalMutation({
   args: {
     projectId: v.id("projects"),
