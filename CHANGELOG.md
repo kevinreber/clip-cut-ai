@@ -14,6 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Credits budget indicator shown in Settings and the project editor with progress bar, remaining count, and contextual nudges when credits are running low or exhausted
 - BYOK (Bring Your Own Key) users bypass all credit limits entirely
 
+### Security
+- Updated undici dependency to fix high severity vulnerabilities (WebSocket parser crashes, HTTP smuggling, memory consumption)
+
 ### Fixed
 - Playwright CI workflow no longer fails when Convex backend is unavailable — gracefully skips with a warning
 
