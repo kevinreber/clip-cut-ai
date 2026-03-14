@@ -232,7 +232,8 @@ Features that enable cross-project analysis and multi-video workflows, transform
 | 16 | ~~TTS Gap Filler~~ | High | High | P3 - DONE |
 | 15 | ~~Multi-Track Timeline~~ | Very High | Very High | P3 - DONE |
 | 20 | ~~AI Zoom / Reframe~~ | Very High | High | P3 - DONE |
-| 21 | AI Story Assembly / Auto-Combine Clips | Very High | Very High | **P4 - NEXT** |
+| 21 | ~~AI Story Assembly / Auto-Combine Clips~~ | Very High | Very High | P4 - DONE |
+| 22 | ~~Video Analytics Dashboard~~ | Low-Med | High | P5 - DONE |
 
 ---
 
