@@ -161,8 +161,12 @@ export default defineSchema({
         generatedAt: v.number(),
       })
     ),
+    folderId: v.optional(v.id("folders")),
+    tags: v.optional(v.array(v.string())),
     createdAt: v.number(),
-  }).index("by_userId", ["userId"]),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_folderId", ["folderId"]),
   exportPresets: defineTable({
     userId: v.string(),
     name: v.string(),
@@ -227,6 +231,12 @@ export default defineSchema({
     resolvedBy: v.optional(v.string()),
     createdAt: v.number(),
   }).index("by_projectId", ["projectId"]),
+  folders: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    color: v.optional(v.string()),
+    createdAt: v.number(),
+  }).index("by_userId", ["userId"]),
   compilations: defineTable({
     userId: v.string(),
     name: v.string(),

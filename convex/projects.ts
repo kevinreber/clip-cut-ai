@@ -279,6 +279,95 @@ export const deleteExportPreset = mutation({
   },
 });
 
+export const moveToFolder = mutation({
+  args: {
+    projectId: v.id("projects"),
+    folderId: v.optional(v.id("folders")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== userId) {
+      throw new Error("Project not found");
+    }
+    await ctx.db.patch(args.projectId, { folderId: args.folderId });
+  },
+});
+
+export const moveMultipleToFolder = mutation({
+  args: {
+    ids: v.array(v.id("projects")),
+    folderId: v.optional(v.id("folders")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    for (const id of args.ids) {
+      const project = await ctx.db.get(id);
+      if (!project || project.userId !== userId) continue;
+      await ctx.db.patch(id, { folderId: args.folderId });
+    }
+  },
+});
+
+export const addTag = mutation({
+  args: {
+    projectId: v.id("projects"),
+    tag: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== userId) {
+      throw new Error("Project not found");
+    }
+    const tags = project.tags ?? [];
+    if (!tags.includes(args.tag)) {
+      await ctx.db.patch(args.projectId, { tags: [...tags, args.tag] });
+    }
+  },
+});
+
+export const removeTag = mutation({
+  args: {
+    projectId: v.id("projects"),
+    tag: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== userId) {
+      throw new Error("Project not found");
+    }
+    const tags = project.tags ?? [];
+    await ctx.db.patch(args.projectId, {
+      tags: tags.filter((t) => t !== args.tag),
+    });
+  },
+});
+
+export const addTagToMultiple = mutation({
+  args: {
+    ids: v.array(v.id("projects")),
+    tag: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    for (const id of args.ids) {
+      const project = await ctx.db.get(id);
+      if (!project || project.userId !== userId) continue;
+      const tags = project.tags ?? [];
+      if (!tags.includes(args.tag)) {
+        await ctx.db.patch(id, { tags: [...tags, args.tag] });
+      }
+    }
+  },
+});
+
 export const updateCaptionStyle = mutation({
   args: {
     projectId: v.id("projects"),
