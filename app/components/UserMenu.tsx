@@ -14,6 +14,13 @@ export function UserMenu() {
     <div className="flex items-center gap-3">
       <ThemeToggleButton />
       <Link
+        to="/analytics"
+        className="rounded-md bg-surface-lighter px-3 py-1 text-sm text-text-muted transition-colors hover:text-white"
+        data-testid="analytics-link"
+      >
+        Analytics
+      </Link>
+      <Link
         to="/settings"
         className="rounded-md bg-surface-lighter px-3 py-1 text-sm text-text-muted transition-colors hover:text-white"
       >
