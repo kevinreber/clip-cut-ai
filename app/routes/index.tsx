@@ -9,6 +9,21 @@ import { LandingPage } from "../components/LandingPage";
 import { BatchProcessing } from "../components/BatchProcessing";
 
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "ClipCut AI - Remove Filler Words from Videos Instantly" },
+      {
+        name: "description",
+        content:
+          "AI-powered video editor that automatically detects and removes ums, uhs, silences, and repetitions. Edit transcripts visually, export clean videos — all in your browser with complete privacy.",
+      },
+      { property: "og:title", content: "ClipCut AI - Remove Filler Words from Videos Instantly" },
+      { property: "og:description", content: "Upload a video and let AI detect filler words, silences, and repetitions. Edit the transcript and export a clean video — all in your browser." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://clipcut.ai/" },
+    ],
+  }),
   component: HomePage,
 });
 

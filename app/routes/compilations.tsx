@@ -5,6 +5,19 @@ import { UserMenu } from "../components/UserMenu";
 import { StoryAssembly } from "../components/StoryAssembly";
 
 export const Route = createFileRoute("/compilations")({
+  head: () => ({
+    meta: [
+      { title: "AI Story Assembly - ClipCut AI | Combine Multiple Videos" },
+      {
+        name: "description",
+        content:
+          "Use AI to assemble the best clips from multiple videos into a cohesive narrative. Choose from highlight reels, chronological, or custom assembly modes.",
+      },
+    ],
+    links: [
+      { rel: "canonical", href: "https://clipcut.ai/compilations" },
+    ],
+  }),
   component: CompilationsPage,
 });
 

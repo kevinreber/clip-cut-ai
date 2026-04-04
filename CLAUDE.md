@@ -96,9 +96,11 @@ scripts/
 .claude/
 ├── settings.json         # Claude Code hooks config
 └── hooks/
-    ├── enforce-changelog.sh        # Blocks pushes without CHANGELOG.md
-    ├── merge-main-before-push.sh   # Auto-merges main before push
-    └── run-e2e-tests-before-push.sh # Runs E2E tests on feature branches
+    ├── enforce-changelog.sh               # Blocks commits without CHANGELOG.md
+    ├── run-checks-before-commit.sh        # Runs lint + build before commits
+    ├── run-security-audit-before-commit.sh # Runs npm audit on dependency changes
+    ├── merge-main-before-push.sh          # Auto-merges main before push
+    └── run-e2e-tests-before-push.sh       # Runs E2E tests on feature branches
 ```
 
 ## Tech Stack
@@ -181,13 +183,15 @@ Defined in `.env.example`. Most are set in the **Convex dashboard** (Settings > 
 - New user-facing features should have corresponding E2E tests.
 - Reporter: HTML locally, GitHub reporter in CI.
 
-## Pre-Push Hooks
+## Pre-Commit & Pre-Push Hooks
 
-Three hooks run automatically via `.claude/settings.json`:
+Five hooks run automatically via `.claude/settings.json`:
 
 1. **enforce-changelog.sh** — Blocks `git commit` if `CHANGELOG.md` is not staged (for user-facing changes).
-2. **merge-main-before-push.sh** — Auto-merges `origin/main` before push to prevent stale-branch conflicts.
-3. **run-e2e-tests-before-push.sh** — Runs `npm run test:e2e` on non-main branches; gracefully skips if Playwright is not installed.
+2. **run-checks-before-commit.sh** — Runs ESLint and production build before commits with code changes.
+3. **run-security-audit-before-commit.sh** — Runs `npm audit` when `package.json` or `package-lock.json` are staged; blocks on high/critical vulnerabilities, warns on moderate.
+4. **merge-main-before-push.sh** — Auto-merges `origin/main` before push to prevent stale-branch conflicts.
+5. **run-e2e-tests-before-push.sh** — Runs `npm run test:e2e` on non-main branches; gracefully skips if Playwright is not installed.
 
 ## Deployment
 

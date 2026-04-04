@@ -12,6 +12,23 @@ import { EditingStats } from "../components/EditingStats";
 import { FillerWordChart } from "../components/FillerWordChart";
 
 export const Route = createFileRoute("/try")({
+  head: () => ({
+    meta: [
+      { title: "Free Trial - ClipCut AI | Upload & Clean Your Video Free" },
+      {
+        name: "description",
+        content:
+          "Upload your own video and try ClipCut AI for free. AI detects filler words, silences, and repetitions — edit the transcript and export a cleaner video, no account needed.",
+      },
+      { property: "og:title", content: "Free Trial - ClipCut AI" },
+      { property: "og:description", content: "Upload a video and try AI-powered filler word removal for free. No account needed." },
+      { name: "twitter:title", content: "Free Trial - ClipCut AI" },
+      { name: "twitter:description", content: "Upload a video and try AI-powered filler word removal for free. No account needed." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://clipcut.ai/try" },
+    ],
+  }),
   component: TryPage,
 });
 
