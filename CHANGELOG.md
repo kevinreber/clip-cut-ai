@@ -10,7 +10,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - SEO infrastructure — robots.txt, sitemap.xml, JSON-LD structured data (SoftwareApplication schema), Open Graph images, Twitter card images, and canonical URLs for all pages
-- Per-route meta tags — every page now has a unique title, description, and Open Graph tags for better search engine ranking and social sharing previews
+- Per-route meta tags — every page (including the homepage) now has a unique title, description, and Open Graph tags for better search engine ranking and social sharing previews
 - Video Cleanup Templates page (`/templates`) — 8 ready-to-use cleanup presets for podcasts, YouTube videos, presentations, interviews, lectures, social media shorts, audiobook narration, and meeting recaps; each template shows detailed settings, targeted filler words, use cases, and pro tips; includes SEO-rich content section explaining filler word removal benefits and privacy-first processing
 - Reusable Keyboard Shortcuts component — extracted the inline shortcuts modal into a standalone `KeyboardShortcuts` component with grouped categories (Playback, Editing, Search & Navigation), Escape-to-close support, and a `useKeyboardShortcutsToggle` hook for easy integration
 - Templates navigation link added to landing page header, landing page footer, and authenticated user menu for discoverability
