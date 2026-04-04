@@ -15,6 +15,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Reusable Keyboard Shortcuts component — extracted the inline shortcuts modal into a standalone `KeyboardShortcuts` component with grouped categories (Playback, Editing, Search & Navigation), Escape-to-close support, and a `useKeyboardShortcutsToggle` hook for easy integration
 - Templates navigation link added to landing page header, landing page footer, and authenticated user menu for discoverability
 
+### Security
+- Fixed 4 dependency vulnerabilities (brace-expansion, flatted, picomatch, srvx) via npm audit fix
+- Added pre-commit security audit hook that automatically runs `npm audit` when package.json or package-lock.json changes are staged; blocks commits with high/critical severity vulnerabilities
+
 ### Changed
 - Expanded SEO keywords in root layout to include "remove silence" and "video cleanup"
 
