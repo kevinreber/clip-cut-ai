@@ -10,6 +10,18 @@ import { WebhookSettings } from "../components/WebhookSettings";
 import { CreditsBadge } from "../components/CreditsBadge";
 
 export const Route = createFileRoute("/settings")({
+  head: () => ({
+    meta: [
+      { title: "Settings - ClipCut AI | API Keys & Account" },
+      {
+        name: "description",
+        content: "Manage your ClipCut AI account settings, OpenAI API key, webhooks, and credits.",
+      },
+    ],
+    links: [
+      { rel: "canonical", href: "https://clipcut.ai/settings" },
+    ],
+  }),
   component: SettingsPage,
 });
 

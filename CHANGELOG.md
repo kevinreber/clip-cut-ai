@@ -9,6 +9,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- SEO infrastructure — robots.txt, sitemap.xml, JSON-LD structured data (SoftwareApplication schema), Open Graph images, Twitter card images, and canonical URLs for all pages
+- Per-route meta tags — every page now has a unique title, description, and Open Graph tags for better search engine ranking and social sharing previews
+- Video Cleanup Templates page (`/templates`) — 8 ready-to-use cleanup presets for podcasts, YouTube videos, presentations, interviews, lectures, social media shorts, audiobook narration, and meeting recaps; each template shows detailed settings, targeted filler words, use cases, and pro tips; includes SEO-rich content section explaining filler word removal benefits and privacy-first processing
+- Reusable Keyboard Shortcuts component — extracted the inline shortcuts modal into a standalone `KeyboardShortcuts` component with grouped categories (Playback, Editing, Search & Navigation), Escape-to-close support, and a `useKeyboardShortcutsToggle` hook for easy integration
+- Templates navigation link added to landing page header, landing page footer, and authenticated user menu for discoverability
+
+### Changed
+- Expanded SEO keywords in root layout to include "remove silence" and "video cleanup"
+
+### Added
 - Project Folders & Tags — organize projects into color-coded folders and apply free-form tags for better library management; collapsible folder sidebar with inline create/rename/delete, tag badges on project cards with autocomplete, tag and folder filtering with dismiss chips, and batch "Move to Folder" / "Add Tag" actions
 - Video Analytics Dashboard — new `/analytics` page showing speaking insights across all projects: total words transcribed, filler word count and percentage, time saved, average words per minute, top filler words with frequency bar chart, per-project breakdown with trend indicators, and filler improvement tracking over time; accessible from the Analytics link in the user menu; analytics route registered in auto-generated route tree
 - Content Repurposing Assistant — one-click AI-powered conversion of video transcripts into 5 platform-ready formats: blog post, LinkedIn post, Twitter/X thread, email newsletter snippet, and YouTube description; tabbed interface with quick-copy buttons for each format

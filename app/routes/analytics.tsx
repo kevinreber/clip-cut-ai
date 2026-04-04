@@ -5,6 +5,19 @@ import "../styles.css";
 import { UserMenu } from "../components/UserMenu";
 
 export const Route = createFileRoute("/analytics")({
+  head: () => ({
+    meta: [
+      { title: "Video Analytics - ClipCut AI | Speaking Insights Dashboard" },
+      {
+        name: "description",
+        content:
+          "Track your speaking improvement over time. View filler word frequency, words per minute, time saved, and detailed per-project analytics.",
+      },
+    ],
+    links: [
+      { rel: "canonical", href: "https://clipcut.ai/analytics" },
+    ],
+  }),
   component: AnalyticsPage,
 });
 

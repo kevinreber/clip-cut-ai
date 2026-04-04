@@ -9,6 +9,19 @@ import { useToast } from "../components/Toast";
 import { ScreenRecorder } from "../components/ScreenRecorder";
 
 export const Route = createFileRoute("/record")({
+  head: () => ({
+    meta: [
+      { title: "Screen Recorder - ClipCut AI | Record & Auto-Clean Videos" },
+      {
+        name: "description",
+        content:
+          "Record your screen directly in the browser and automatically clean up filler words and silences with AI. Perfect for tutorials, presentations, and video messages.",
+      },
+    ],
+    links: [
+      { rel: "canonical", href: "https://clipcut.ai/record" },
+    ],
+  }),
   component: RecordPage,
 });
 

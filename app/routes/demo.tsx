@@ -29,6 +29,23 @@ import {
 } from "../lib/subtitle-export";
 
 export const Route = createFileRoute("/demo")({
+  head: () => ({
+    meta: [
+      { title: "Interactive Demo - ClipCut AI | Try Video Filler Word Removal" },
+      {
+        name: "description",
+        content:
+          "See ClipCut AI in action with a pre-loaded demo. Watch how AI detects and removes filler words, silences, and repetitions from video transcripts — no signup required.",
+      },
+      { property: "og:title", content: "Interactive Demo - ClipCut AI" },
+      { property: "og:description", content: "Try our AI video editor demo — see filler word detection, transcript editing, and clean export in action." },
+      { name: "twitter:title", content: "Interactive Demo - ClipCut AI" },
+      { name: "twitter:description", content: "Try our AI video editor demo — see filler word detection, transcript editing, and clean export in action." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://clipcut.ai/demo" },
+    ],
+  }),
   component: DemoPage,
 });
 

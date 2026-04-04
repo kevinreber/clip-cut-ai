@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Allow: /demo
+Allow: /try
+Allow: /changelog
+Allow: /templates
+
+Disallow: /project/
+Disallow: /settings
+Disallow: /analytics
+Disallow: /record
+Disallow: /compilations
+
+Sitemap: https://clipcut.ai/sitemap.xml

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TryRouteImport } from './routes/try'
+import { Route as TemplatesRouteImport } from './routes/templates'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as RecordRouteImport } from './routes/record'
 import { Route as DemoRouteImport } from './routes/demo'
@@ -22,6 +23,11 @@ import { Route as ProjectIdRouteImport } from './routes/project.$id'
 const TryRoute = TryRouteImport.update({
   id: '/try',
   path: '/try',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplatesRoute = TemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/demo': typeof DemoRoute
   '/record': typeof RecordRoute
   '/settings': typeof SettingsRoute
+  '/templates': typeof TemplatesRoute
   '/try': typeof TryRoute
   '/project/$id': typeof ProjectIdRoute
 }
@@ -84,6 +91,7 @@ export interface FileRoutesByTo {
   '/demo': typeof DemoRoute
   '/record': typeof RecordRoute
   '/settings': typeof SettingsRoute
+  '/templates': typeof TemplatesRoute
   '/try': typeof TryRoute
   '/project/$id': typeof ProjectIdRoute
 }
@@ -96,6 +104,7 @@ export interface FileRoutesById {
   '/demo': typeof DemoRoute
   '/record': typeof RecordRoute
   '/settings': typeof SettingsRoute
+  '/templates': typeof TemplatesRoute
   '/try': typeof TryRoute
   '/project/$id': typeof ProjectIdRoute
 }
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/record'
     | '/settings'
+    | '/templates'
     | '/try'
     | '/project/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/record'
     | '/settings'
+    | '/templates'
     | '/try'
     | '/project/$id'
   id:
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/demo'
     | '/record'
     | '/settings'
+    | '/templates'
     | '/try'
     | '/project/$id'
   fileRoutesById: FileRoutesById
@@ -143,6 +155,7 @@ export interface RootRouteChildren {
   DemoRoute: typeof DemoRoute
   RecordRoute: typeof RecordRoute
   SettingsRoute: typeof SettingsRoute
+  TemplatesRoute: typeof TemplatesRoute
   TryRoute: typeof TryRoute
   ProjectIdRoute: typeof ProjectIdRoute
 }
@@ -154,6 +167,13 @@ declare module '@tanstack/react-router' {
       path: '/try'
       fullPath: '/try'
       preLoaderRoute: typeof TryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/templates': {
+      id: '/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof TemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -223,6 +243,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemoRoute: DemoRoute,
   RecordRoute: RecordRoute,
   SettingsRoute: SettingsRoute,
+  TemplatesRoute: TemplatesRoute,
   TryRoute: TryRoute,
   ProjectIdRoute: ProjectIdRoute,
 }

@@ -38,6 +38,7 @@ import { TtsGapFiller } from "../components/TtsGapFiller";
 import { AIZoomReframe } from "../components/AIZoomReframe";
 import { ContentRepurpose } from "../components/ContentRepurpose";
 import { CreditsBadge } from "../components/CreditsBadge";
+import { KeyboardShortcuts } from "../components/KeyboardShortcuts";
 
 export const Route = createFileRoute("/project/$id")({
   component: ProjectEditor,
@@ -1771,54 +1772,7 @@ function ProjectEditorContent() {
         />
       )}
 
-      {showShortcuts && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 animate-fade-in"
-          onClick={() => setShowShortcuts(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-xl bg-surface-light border border-surface-lighter p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">Keyboard Shortcuts</h3>
-              <button
-                onClick={() => setShowShortcuts(false)}
-                className="text-text-muted hover:text-white text-xl"
-              >
-                &times;
-              </button>
-            </div>
-            <div className="space-y-2 text-sm">
-              {[
-                ["Space / K", "Play / Pause"],
-                ["P", "Toggle preview mode"],
-                ["\u2190 / \u2192", "Seek back / forward 5s"],
-                ["J / L", "Seek back / forward 10s"],
-                [", / .", "Previous / Next word"],
-                ["0", "Jump to start"],
-                ["[ / ]", "Slow down / Speed up playback"],
-                ["M", "Mute / Unmute"],
-                ["/", "Focus search"],
-                ["Ctrl+F", "Focus search"],
-                ["F3 / Shift+F3", "Next / Previous search match"],
-                ["Ctrl+Z", "Undo"],
-                ["Ctrl+Shift+Z", "Redo"],
-                ["Shift+Click", "Select word range"],
-                ["Double-click", "Delete / Restore word"],
-                ["?", "Toggle this help"],
-              ].map(([key, desc]) => (
-                <div key={key} className="flex items-center justify-between">
-                  <kbd className="rounded bg-surface px-2 py-1 text-xs font-mono text-white border border-surface-lighter">
-                    {key}
-                  </kbd>
-                  <span className="text-text-muted">{desc}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      <KeyboardShortcuts open={showShortcuts} onClose={() => setShowShortcuts(false)} />
     </div>
   );
 }

@@ -3,6 +3,21 @@ import { ThemeToggleButton } from "../components/ThemeToggle";
 import changelogRaw from "../../CHANGELOG.md?raw";
 
 export const Route = createFileRoute("/changelog")({
+  head: () => ({
+    meta: [
+      { title: "Changelog - ClipCut AI | Latest Updates & New Features" },
+      {
+        name: "description",
+        content:
+          "See what's new in ClipCut AI. Latest features, improvements, and bug fixes for the AI-powered video filler word removal editor.",
+      },
+      { property: "og:title", content: "Changelog - ClipCut AI" },
+      { property: "og:description", content: "Latest updates, features, and improvements to ClipCut AI." },
+    ],
+    links: [
+      { rel: "canonical", href: "https://clipcut.ai/changelog" },
+    ],
+  }),
   component: ChangelogPage,
 });
 
