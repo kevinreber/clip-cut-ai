@@ -1,0 +1,9 @@
+{
+  "displayName": "ClipCut AI",
+  "description": "AI video editor that automatically detects and removes filler words, silences, and repetitions. Upload a video, review the interactive transcript, and export a polished cut — all processed client-side with FFmpeg.",
+  "tech": ["React", "TanStack Start", "Convex", "FFmpeg.wasm", "TypeScript", "Tailwind"],
+  "thumbnail": "docs/images/thumbnail.png",
+  "demo": "docs/images/demo.gif",
+  "liveUrl": "https://clip-cut-ai-omega.vercel.app",
+  "order": 1
+}
